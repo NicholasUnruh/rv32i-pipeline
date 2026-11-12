@@ -1,4 +1,4 @@
-program,size,ways,line,policy,accesses,misses,writebacks,dstall,cycles,instret,cpi
+program,size,ways,line,policy,accesses,misses,writebacks,stall,cycles,instret,cpi
 aha-mont64,256,1,16,lru,76884,25,5,450,13596568,10982238,1.23805
 aha-mont64,256,1,16,srrip,76884,25,5,450,13596568,10982238,1.23805
 aha-mont64,256,1,16,brrip,76884,25,5,450,13596568,10982238,1.23805

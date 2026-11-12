@@ -33,3 +33,7 @@ Benchmark CPI against memory latency:
 | CPI | 1.070 | 1.073 | 1.084 | 1.102 | 1.137 |
 
 Yosys: 1,722 ALUTs, 284 carry cells, 575 flip-flops, 530 MLAB cells.
+
+![CPI stack per step](img/cpi-stack.png)
+
+*Misses add 0.053 CPI to the benchmark but 2.81 to the riscv-tests (`scripts/cpi_stack.py`).*

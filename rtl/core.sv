@@ -26,6 +26,7 @@ module core (
     logic        valid;
     logic [31:0] pc;
     logic [31:0] instr;
+    logic        pred_hit;     // IF's BTB lookup, used to update the BTB in EX
     logic        pred_taken;   // IF's prediction, checked in EX
     logic [31:0] pred_target;
   } if_id_t;
@@ -33,7 +34,7 @@ module core (
   typedef struct packed {
     logic        valid;
     logic [31:0] pc;
-    logic        pred_taken;
+    logic        pred_hit, pred_taken;
     logic [31:0] pred_target;
     logic [4:0]  rs1, rs2, rd;
     logic        uses_rs1, uses_rs2;
@@ -69,8 +70,10 @@ module core (
   logic [31:0] redirect_pc;
 
   // ---------------------------------------------------------------- IF
-  logic [31:0] pc;
-  logic pred_taken;
+  // The cache and BTB arrays are synchronous, so they are read with next_pc and
+  // answer for pc in the following cycle.
+  logic [31:0] pc, next_pc;
+  logic pred_hit, pred_taken;
   logic [31:0] pred_target;
   logic cache_hit;
   logic [31:0] cache_instr;
@@ -78,7 +81,8 @@ module core (
   icache cache (
       .clk(clk),
       .rst_n(rst_n),
-      .pc(pc[31:2]),
+      .next_pc(next_pc[9:2]),
+      .pc(pc[31:4]),
       .hit(cache_hit),
       .instr(cache_instr),
       .mem_req(imem_req),
@@ -93,14 +97,22 @@ module core (
     if_id_next.valid = cache_hit;  // a miss sends a bubble
     if_id_next.pc = pc;
     if_id_next.instr = cache_instr;
+    if_id_next.pred_hit = pred_hit;
     if_id_next.pred_taken = pred_taken;
     if_id_next.pred_target = pred_target;
   end
 
+  always_comb begin
+    if (!rst_n) next_pc = RESET_PC;
+    else if (redirect) next_pc = redirect_pc;
+    else if (stall || !cache_hit) next_pc = pc;
+    else if (pred_taken) next_pc = pred_target;
+    else next_pc = pc + 32'd4;
+  end
+
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) pc <= RESET_PC;
-    else if (redirect) pc <= redirect_pc;
-    else if (!stall && cache_hit) pc <= pred_taken ? pred_target : pc + 32'd4;
+    else pc <= next_pc;
   end
 
   // ---------------------------------------------------------------- ID
@@ -155,6 +167,7 @@ module core (
     if (if_id.valid && !stall) begin
       id_ex_next.valid = 1'b1;
       id_ex_next.pc = if_id.pc;
+      id_ex_next.pred_hit = if_id.pred_hit;
       id_ex_next.pred_taken = if_id.pred_taken;
       id_ex_next.pred_target = if_id.pred_target;
       id_ex_next.rs1 = rs1;
@@ -220,11 +233,14 @@ module core (
   btb predictor (
       .clk(clk),
       .rst_n(rst_n),
-      .lookup_pc(pc[31:2]),
+      .next_pc(next_pc[7:2]),
+      .pc(pc[31:2]),
+      .lookup_hit(pred_hit),
       .predict_taken(pred_taken),
       .predict_target(pred_target),
       .update(id_ex.valid && is_control),
       .update_pc(id_ex.pc[31:2]),
+      .update_hit(id_ex.pred_hit),
       .update_taken(taken),
       .update_target(target)
   );

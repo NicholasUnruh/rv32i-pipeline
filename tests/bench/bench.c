@@ -35,8 +35,10 @@ static int binary_search(const uint32_t *a, int n, uint32_t key) {
   while (lo <= hi) {
     int mid = (lo + hi) >> 1;
     if (a[mid] == key) return mid;
-    if (a[mid] < key) lo = mid + 1;
-    else hi = mid - 1;
+    if (a[mid] < key)
+      lo = mid + 1;
+    else
+      hi = mid - 1;
   }
   return -1;
 }

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Check the RTL data cache against cache-sim, access by access.
+"""Check the RTL caches against cache-sim, access by access.
 
-crosscheck.py [--cachesim PATH] [--cache SETS_BITS,WAYS,OFFSET_BITS ...] hex...
+crosscheck.py [--cachesim PATH] [--cache SETS_BITS,WAYS,OFFSET_BITS ...]
+              [--icache SETS_BITS,WAYS ...] hex...
 
 For every program and geometry, the testbench writes the core's data accesses as
 a cache-sim trace and its own per-access events (hit or miss, victim, dirty
@@ -9,6 +10,10 @@ writeback, the set's tags afterwards). cache-sim replays the trace with the same
 geometry and LRU and writes its events. Prints one CSV row per run with both
 sides' counts and the number of event lines that differ; exits 1 on any
 difference.
+
+With --icache, the instruction cache is checked instead, at each geometry given
+(16 B lines, BRRIP): the testbench writes its lookups (+itrace) and cache-sim's
+misses must equal the RTL's line fills. The I-cache keeps no per-access events.
 """
 
 from __future__ import annotations
@@ -20,18 +25,19 @@ import subprocess
 import sys
 from pathlib import Path
 
-from measure import ROOT, build, run
+from measure import ICACHE, ROOT, build, run
 
 OUT = ROOT / "build" / "crosscheck"
 
 
-def cachesim(binary: str, cache: tuple[int, int, int], trace: Path, events: Path) -> list[int]:
+def cachesim(binary: str, cache: tuple[int, int, int], trace: Path, events: Path | None,
+             policy: str = "lru") -> list[int]:
     """Replay a trace in cache-sim; return its L1 accesses, misses and writebacks."""
     index_bits, ways, offset_bits = cache
     size = (1 << (index_bits + offset_bits)) * ways
     out = subprocess.run(
         [binary, "--size", str(size), "--ways", str(ways), "--line", str(1 << offset_bits),
-         "--policy", "lru", "--events", str(events), str(trace)],
+         "--policy", policy, *(["--events", str(events)] if events else []), str(trace)],
         check=True, capture_output=True, text=True, timeout=600).stdout
     l1 = next(line.split() for line in out.splitlines() if line.startswith("L1"))
     return [int(l1[1]), int(l1[2]), int(l1[4])]
@@ -71,22 +77,44 @@ def check(binary: Path, sim: str, cache: tuple[int, int, int], hex_file: str) ->
             "match": rtl_counts == sim_counts and differing == 0}
 
 
+def icheck(binary: Path, sim: str, icache: tuple[int, int], hex_file: str) -> dict:
+    name = Path(hex_file).stem
+    out = OUT / "icache-i{}w{}".format(*icache)
+    out.mkdir(parents=True, exist_ok=True)
+    trace = out / f"{name}.trace"
+    rtl = run(binary, hex_file, 10, [f"+itrace={trace}"])
+    accesses, misses, _ = cachesim(sim, (icache[0], icache[1], 4), trace, None, "brrip")
+    return {"program": name, "sets": 1 << icache[0], "ways": icache[1], "line": 16,
+            "lookups": accesses, "rtl_fills": int(rtl["fills"]), "sim_misses": misses,
+            "match": int(rtl["fills"]) == misses}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--cachesim", default=str(ROOT.parent / "cache-sim/build/cachesim"))
     parser.add_argument("--cache", action="append", default=[],
                         help="SETS_BITS,WAYS,OFFSET_BITS (default 6,2,6)")
+    parser.add_argument("--icache", action="append", default=[],
+                        help="check the instruction cache at SETS_BITS,WAYS instead")
     parser.add_argument("--jobs", type=int, default=6)
     parser.add_argument("hex", nargs="+")
     args = parser.parse_args()
     caches = [tuple(int(x) for x in c.split(",")) for c in args.cache] or [(6, 2, 6)]
+    icaches = [tuple(int(x) for x in c.split(",")) for c in args.icache]
 
-    binaries = {cache: build(cache) for cache in caches}
+    if icaches:
+        binaries = {ic: build(caches[0], ic) for ic in icaches}
+    else:
+        binaries = {cache: build(cache, ICACHE) for cache in caches}
     writer = None
     ok = True
     with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
-        futures = [pool.submit(check, binaries[c], args.cachesim, c, h)
-                   for c in caches for h in args.hex]
+        if icaches:
+            futures = [pool.submit(icheck, binaries[ic], args.cachesim, ic, h)
+                       for ic in icaches for h in args.hex]
+        else:
+            futures = [pool.submit(check, binaries[c], args.cachesim, c, h)
+                       for c in caches for h in args.hex]
         for future in futures:
             row = future.result()
             ok &= row["match"]

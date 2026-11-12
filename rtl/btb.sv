@@ -1,6 +1,8 @@
 // Branch target buffer with a 2-bit saturating counter per entry, direct-mapped
 // on the PC. Fetch looks up its PC: a hit whose counter is 2 or 3 predicts taken
-// to the stored target. EX updates the entry of every branch and jump it resolves.
+// to the stored target. EX updates the entry of every branch and jump it resolves;
+// the update is registered and lands one cycle later, which keeps the data cache's
+// stall (part of the update enable) off the counters' input path.
 // Tags and targets are synchronous block RAM read with the next PC, like the
 // instruction cache; valid bits and counters are registers.
 module btb #(
@@ -34,8 +36,25 @@ module btb #(
   logic [INDEX_BITS-1:0] index, update_index;
   logic [1:0] counter;
 
+  // The update, one cycle after EX resolved it
+  logic u_valid, u_hit, u_taken;
+  logic [31:2] u_pc;
+  logic [31:0] u_target;
+
+  always_ff @(posedge clk or negedge rst_n) begin
+    if (!rst_n) u_valid <= 1'b0;
+    else u_valid <= update;
+  end
+
+  always_ff @(posedge clk) begin
+    u_pc <= update_pc;
+    u_hit <= update_hit;
+    u_taken <= update_taken;
+    u_target <= update_target;
+  end
+
   assign index = pc[INDEX_BITS+1:2];
-  assign update_index = update_pc[INDEX_BITS+1:2];
+  assign update_index = u_pc[INDEX_BITS+1:2];
 
   always_ff @(posedge clk) begin
     tag_q <= tags[next_pc];
@@ -51,11 +70,11 @@ module btb #(
   // predicted taken: one-off taken branches and two-trip loops then cost no extra
   // misprediction. A not-taken miss leaves the BTB alone.
   always_ff @(posedge clk) begin
-    if (update && update_hit) begin
-      if (update_taken) targets[update_index] <= update_target;
-    end else if (update && update_taken) begin
-      tags[update_index] <= update_pc[31:INDEX_BITS+2];
-      targets[update_index] <= update_target;
+    if (u_valid && u_hit) begin
+      if (u_taken) targets[update_index] <= u_target;
+    end else if (u_valid && u_taken) begin
+      tags[update_index] <= u_pc[31:INDEX_BITS+2];
+      targets[update_index] <= u_target;
     end
   end
 
@@ -63,10 +82,10 @@ module btb #(
     if (!rst_n) begin
       valid <= '0;
       for (int i = 0; i < ENTRIES; i++) counters[i] <= 2'd0;
-    end else if (update && update_hit) begin
-      if (update_taken) counters[update_index] <= counter == 2'd3 ? 2'd3 : counter + 2'd1;
+    end else if (u_valid && u_hit) begin
+      if (u_taken) counters[update_index] <= counter == 2'd3 ? 2'd3 : counter + 2'd1;
       else counters[update_index] <= counter == 2'd0 ? 2'd0 : counter - 2'd1;
-    end else if (update && update_taken) begin
+    end else if (u_valid && u_taken) begin
       valid[update_index] <= 1'b1;
       counters[update_index] <= 2'd1;
     end

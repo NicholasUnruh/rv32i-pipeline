@@ -1,0 +1,30 @@
+# sby dcache.sby prove (abc pdr), stopped at the 3000 s limit
+output 0: assert_dcache_sv_236_assert_3403
+output 1: assert_dcache_sv_237_assert_3409
+output 2: assert_dcache_formal_sv_145_assert_2897
+output 3: assert_dcache_formal_sv_146_assert_2902
+output 4: assert_dcache_formal_sv_148_assert_2908
+output 5: assert_dcache_formal_sv_149_assert_2912
+# 0 no I/O load, 1 a replayed access hits (rtl/dcache.sv); 2 a load of A returns
+# the last store, 3 I/O store passes through, 4 stall bound, 5 one line in flight
+# (formal/dcache_formal.sv)
+Proved output 3 in frame 1.
+Proved output 0 in frame 3.
+Proved output 5 in frame 11.
+Proved output 1 in frame 27.
+Proved output 4 in frame 6 (converged).
+Timing out on output 2 in frame 18 (retrying in next anytime pass).  (last message before the limit)
+
+# sby dcache.sby bmc (abc bmc3, depth 40): last frames, none with a failing assertion
+35 + : Var =   86991. Cla =   233006. Conf =2904226. Learn = 108171.    1 MB  66 MB  1134.83 sec
+36 + : Var =   89700. Cla =   240588. Conf =3715095. Learn = 135613.    1 MB  83 MB  1758.37 sec
+37 + : Var =   92409. Cla =   248170. Conf =4340061. Learn =  98614.    1 MB  61 MB  2385.00 sec
+38 + : Var =   95118. Cla =   255752. Conf =5709245. Learn = 176270.    1 MB 107 MB  3324.77 sec
+39 + : Var =   97827. Cla =   263334. Conf =7169551. Learn = 171248.    1 MB 100 MB  4911.40 sec
+
+# sby dcache.sby reach (abc bmc3): the witness
+Output 6 of miter "model/design_aiger" was asserted in frame 36. Time =  2550.40 sec
+failed assertion dcache_formal._witness_.assert_dcache_formal_reach_sv_157_assert_2923 at dcache_formal.sv:157.5-157.66 step 36
+
+# sby dcache.sby cover (smtbmc yices)
+##   0:12:47  Reached cover statement in step 28 at dcache_formal: dcache_formal.sv:158.5-158.35 (_witness_.cover_dcache_formal_sv_158_cover_2928)

@@ -233,8 +233,8 @@ module dcache #(
 `ifndef SYNTHESIS
   always @(posedge clk)
     if (rst_n) begin
-      assert (!(state == IDLE && read && !cached)) else $error("I/O load from %h", addr);
-      assert (!(miss && replay)) else $error("replayed access missed at %h", addr);
+      assert (!(state == IDLE && read && !cached));  // no I/O loads
+      assert (!(miss && replay));  // a replayed access hits
     end
 `endif
 endmodule

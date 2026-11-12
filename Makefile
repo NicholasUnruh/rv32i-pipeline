@@ -1,4 +1,4 @@
-.PHONY: check tests sim bench lint synth build program toolchain clean crosscheck
+.PHONY: check tests sim bench lint synth build program toolchain clean crosscheck embench
 
 XPACK := xpack-riscv-none-elf-gcc-15.2.0-1
 XPACK_URL := https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases/download/v15.2.0-1/$(XPACK)-linux-x64.tar.gz
@@ -20,7 +20,7 @@ toolchain:
 		curl -fsSL --max-time 600 $(XPACK_URL) | tar -xz -C $(HOME)/.local/opt)
 
 # Keep the ELFs for objdump when a test fails.
-.PRECIOUS: build/tests/%.elf
+.PRECIOUS: build/tests/%.elf build/embench/%.elf
 
 tests: $(HEX)
 
@@ -62,10 +62,32 @@ bench: build/bench/bench.hex $(RTL) tb/tb.sv
 	timeout 60 vvp -n build/tb.vvp +hex=$< | grep -m1 -E '^(PASS|FAIL|ERROR)' | tee build/bench.log
 	grep -q '^PASS' build/bench.log
 
+# Embench-IoT 1.0, RV32I builds of the integer programs. The float programs (and
+# wikisort, which calls sqrt) would spend their time in soft-float library code.
+EMBENCH := third_party/embench-iot
+EMBENCH_PROGRAMS := aha-mont64 crc32 edn huffbench matmult-int nettle-aes nettle-sha256 \
+	nsichneu picojpeg qrduino sglib-combined slre statemate ud
+EMBENCH_HEX := $(EMBENCH_PROGRAMS:%=build/embench/%.hex)
+
+embench: $(EMBENCH_HEX)
+
+.SECONDEXPANSION:
+build/embench/%.elf: $$(wildcard $(EMBENCH)/src/$$*/*.c) tests/embench/crt0.S \
+		tests/embench/boardsupport.c tests/embench/boardsupport.h tests/env/link.ld
+	@mkdir -p build/embench
+	$(RISCV)gcc -march=rv32i -mabi=ilp32 -O2 -std=gnu17 -static -nostartfiles -Wl,--no-warn-rwx-segments \
+		-DHAVE_BOARDSUPPORT_H -Itests/embench -I$(EMBENCH)/support -Ttests/env/link.ld -o $@ \
+		tests/embench/crt0.S tests/embench/boardsupport.c $(EMBENCH)/support/main.c \
+		$(EMBENCH)/support/beebsc.c $(wildcard $(EMBENCH)/src/$*/*.c) -lc -lgcc
+
+build/embench/%.hex: build/embench/%.elf
+	$(RISCV)objcopy -O binary $< build/embench/$*.bin
+	python3 scripts/bin2hex.py build/embench/$*.bin $@
+
 # Data cache against cache-sim, access by access, on every program and seven
 # geometries; needs a cache-sim build (https://github.com/NicholasUnruh/cache-sim).
 CACHESIM ?= ../cache-sim/build/cachesim
-CROSSCHECK_CACHES := 1,1,3 1,2,3 1,1,4 3,2,4 2,4,5 3,4,4 5,2,4
+CROSSCHECK_CACHES := 1,1,3 1,2,3 1,1,4 3,2,4 2,4,5 3,4,4 5,2,4 6,2,6
 crosscheck: $(HEX) build/bench/bench.hex
 	mkdir -p results/7-crosscheck
 	python3 scripts/crosscheck.py --cachesim $(CACHESIM) $(CROSSCHECK_CACHES:%=--cache %) \

@@ -2,7 +2,7 @@
 
 ## Design
 
-`rtl/dcache.sv`: set-associative, write-back, write-allocate, LRU. The default is 1 KB (32 sets, 2 ways, 16-byte lines); sets, ways and line size are parameters of `core`.
+`rtl/dcache.sv`: set-associative, write-back, write-allocate, LRU. This step used 1 KB (32 sets, 2 ways, 16-byte lines); sets, ways and line size are parameters of `core`, and step 8 chose 8 KB (64 sets, 2 ways, 64-byte lines) as the default from Embench.
 
 - **Lookup**: as in the instruction cache, the tag and data arrays are block RAM read with EX's address, so MEM compares tags a clock later and a hit costs nothing.
 - **Stores move from EX to MEM**: a store must know it hits before it writes. A store that hits writes on the edge where the next instruction reads the arrays, so if that next access is to the same word, the cache merges the store's bytes into the read data (a one-entry bypass).

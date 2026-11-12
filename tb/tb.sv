@@ -1,16 +1,20 @@
 // Runs one program on `core`: +hex=<file> [+mem_latency=N] [+max_cycles=N]. Prints
 // one PASS or FAIL line with the cycles, retired instructions, instruction fetches
 // and line fills, and data cache accesses, hits, misses and writebacks, from reset
-// release to the tohost store. The data cache geometry comes from the parameters.
+// release to the tohost store. The cache geometries come from the parameters.
 // For checking the data cache against cache-sim:
 //   +dtrace=<file>   every cached data access in order, as cache-sim's trace format
 //   +devents=<file>  one line per access in the format of `cachesim --events`
+//   +itrace=<file>   every instruction cache lookup that hits or requests a line,
+//                    16 B lines, consecutive repeats dropped (cache-sim's format)
 `timescale 1ns / 1ps
 
 module tb #(
     parameter int DCACHE_INDEX_BITS = 6,
     parameter int DCACHE_WAYS = 2,
-    parameter int DCACHE_OFFSET_BITS = 6
+    parameter int DCACHE_OFFSET_BITS = 6,
+    parameter int ICACHE_INDEX_BITS = 7,
+    parameter int ICACHE_WAYS = 8
 );
   localparam logic [31:0] BASE = 32'h8000_0000;
   localparam logic [31:0] TOHOST = 32'h4000_0000;  // I/O: not cached
@@ -38,11 +42,15 @@ module tb #(
   int dwritebacks = 0;
   int dtrace_fd = 0;
   int devents_fd = 0;
+  int itrace_fd = 0;
+  logic [31:4] itrace_line = '1;
 
   core #(
       .DCACHE_INDEX_BITS(DCACHE_INDEX_BITS),
       .DCACHE_WAYS(DCACHE_WAYS),
-      .DCACHE_OFFSET_BITS(DCACHE_OFFSET_BITS)
+      .DCACHE_OFFSET_BITS(DCACHE_OFFSET_BITS),
+      .ICACHE_INDEX_BITS(ICACHE_INDEX_BITS),
+      .ICACHE_WAYS(ICACHE_WAYS)
   ) dut (
       .clk(clk),
       .rst_n(rst_n),
@@ -165,19 +173,29 @@ module tb #(
       end
     end
 
+  // A lookup that misses during a fill has no effect until it hits or requests
+  // its line, so only those two are logged. A repeated hit does not change LRU order.
+  always @(posedge clk)
+    if (rst_n && itrace_fd != 0 && (dut.cache_hit || imem_req) && dut.pc[31:4] != itrace_line) begin
+      $fwrite(itrace_fd, "R %0h\n", {dut.pc[31:4], 4'b0});
+      itrace_line <= dut.pc[31:4];
+    end
+
   string path;
   initial begin
+    if ($value$plusargs("itrace=%s", path)) itrace_fd = $fopen(path, "w");
     if ($value$plusargs("dtrace=%s", path)) dtrace_fd = $fopen(path, "w");
     if ($value$plusargs("devents=%s", path)) devents_fd = $fopen(path, "w");
   end
   final begin
     if (dtrace_fd != 0) $fclose(dtrace_fd);
     if (devents_fd != 0) $fclose(devents_fd);
+    if (itrace_fd != 0) $fclose(itrace_fd);
   end
 
   initial begin
     if (!$value$plusargs("hex=%s", hex))
-      $fatal(1, "usage: +hex=<file> [+mem_latency=N] [+max_cycles=N] [+dtrace=F] [+devents=F]");
+      $fatal(1, "usage: +hex=<file> [+mem_latency=N] [+max_cycles=N] [+dtrace=F] [+devents=F] [+itrace=F]");
     void'($value$plusargs("mem_latency=%d", mem_latency));
     void'($value$plusargs("max_cycles=%d", max_cycles));
     if (mem_latency < 1) $fatal(1, "mem_latency must be at least 1");

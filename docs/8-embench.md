@@ -12,7 +12,7 @@ The D-cache stalls for 16.4% of all lost cycles and the I-cache for 61.8%. nettl
 
 ## Sweep
 
-`scripts/dcache_sweep.py` replays each program's data trace (`+dtrace`) through [cache-sim](https://github.com/NicholasUnruh/cache-sim). The grid is 256 B to 16 KB, 1 to 8 ways, 16 to 64 B lines, and LRU, SRRIP and BRRIP: 240 configurations per program (`results/8-embench/sweep.csv`). Predicted cycles are the measured cycles without D-stalls, plus L + W + 3 per miss and W + 1 per dirty victim (W words per line).
+`scripts/cache_sweep.py --side d` replays each program's data trace (`+dtrace`) through [cache-sim](https://github.com/NicholasUnruh/cache-sim). The grid is 256 B to 16 KB, 1 to 8 ways, 16 to 64 B lines, and LRU, SRRIP and BRRIP: 240 configurations per program (`results/8-embench/sweep.csv`). Predicted cycles are the measured cycles without D-stalls, plus L + W + 3 per miss and W + 1 per dirty victim (W words per line).
 
 ![Sweep and per-program D-stall](journal/img/dcache-sweep.png)
 

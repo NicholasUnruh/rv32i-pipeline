@@ -10,7 +10,9 @@
 module core #(
     parameter int DCACHE_INDEX_BITS = 6,   // data cache: 2^bits sets...
     parameter int DCACHE_WAYS = 2,         // ...of this many ways...
-    parameter int DCACHE_OFFSET_BITS = 6   // ...of 2^bits-byte lines (8 KB, docs/8-embench.md)
+    parameter int DCACHE_OFFSET_BITS = 6,  // ...of 2^bits-byte lines (8 KB, docs/8-embench.md)
+    parameter int ICACHE_INDEX_BITS = 7,   // instruction cache: 2^bits sets of 16-byte lines...
+    parameter int ICACHE_WAYS = 8          // ...of this many ways (16 KB, docs/10-icache.md)
 ) (
     input  logic        clk,
     input  logic        rst_n,
@@ -89,10 +91,13 @@ module core #(
   logic cache_hit;
   logic [31:0] cache_instr;
 
-  icache cache (
+  icache #(
+      .INDEX_BITS(ICACHE_INDEX_BITS),
+      .WAYS(ICACHE_WAYS)
+  ) cache (
       .clk(clk),
       .rst_n(rst_n),
-      .next_pc(next_pc[9:2]),
+      .next_pc(next_pc[ICACHE_INDEX_BITS+3:2]),
       .pc(pc[31:4]),
       .hit(cache_hit),
       .instr(cache_instr),

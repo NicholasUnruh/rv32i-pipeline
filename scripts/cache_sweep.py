@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
-"""Sweep data cache size, ways, line and policy in cache-sim on the core's traces.
+"""Sweep cache size, ways, line and policy in cache-sim on the core's traces.
 
-dcache_sweep.py --cachesim PATH --measured CSV --latency L trace...
+cache_sweep.py --side d|i --cachesim PATH --measured CSV --latency L trace...
 
-The traces are the core's data accesses (from the testbench's +dtrace), which do
-not depend on the cache. For each geometry and policy, cache-sim gives the
-misses and dirty writebacks; the core stalls L + W + 3 cycles per miss and
-W + 1 more per dirty victim (W = words per line, docs/6-dcache.md). The
-measured CSV (scripts/measure.py at latency L) gives each program's cycles
-without D-cache stalls (cycles - dcmiss), so the predicted cycles are that plus
-the modelled stalls. Prints one CSV row per program, geometry and policy.
+Data side: the traces are the core's data accesses (+dtrace), which do not depend
+on the cache. The core stalls L + W + 3 cycles per miss and W + 1 more per dirty
+victim (W = words per line, docs/6-dcache.md).
+
+Instruction side: the traces are the I-cache lookups that hit or request a line
+(+itrace, 16 B granularity). Wrong-path fetches make them depend slightly on the
+cache they were recorded with (docs/10-icache.md). A miss stalls fetch for
+L + W + 2 cycles (docs/4-icache.md, plus the valid bit's cycle from step 5).
+
+For each geometry and policy, cache-sim gives the misses and writebacks. The
+measured CSV (scripts/measure.py at latency L) gives each program's cycles without
+that side's stalls (cycles - dcmiss, or cycles - icmiss), so the predicted cycles
+are that plus the modelled stalls. Prints one CSV row per program, geometry and
+policy.
 """
 
 from __future__ import annotations
@@ -39,6 +46,7 @@ def cachesim(binary: str, size: int, ways: int, line: int, policy: str,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--side", choices=["d", "i"], required=True)
     parser.add_argument("--cachesim", required=True)
     parser.add_argument("--measured", required=True)
     parser.add_argument("--latency", type=int, default=10)
@@ -53,18 +61,22 @@ def main() -> int:
     jobs = [(Path(t), c) for t in args.trace for c in configs]
     writer = csv.writer(sys.stdout)
     writer.writerow(["program", "size", "ways", "line", "policy", "accesses", "misses",
-                     "writebacks", "dstall", "cycles", "instret", "cpi"])
+                     "writebacks", "stall", "cycles", "instret", "cpi"])
     with concurrent.futures.ThreadPoolExecutor(args.jobs) as pool:
         futures = [pool.submit(cachesim, args.cachesim, *c, t) for t, c in jobs]
         for (trace, (size, ways, line, policy)), future in zip(jobs, futures):
             accesses, misses, writebacks = future.result()
             row = measured[trace.stem]
             words = line // 4
-            dstall = misses * (args.latency + words + 3) + writebacks * (words + 1)
-            cycles = int(row["cycles"]) - int(row["dcmiss"]) + dstall
+            if args.side == "d":
+                stall = misses * (args.latency + words + 3) + writebacks * (words + 1)
+                cycles = int(row["cycles"]) - int(row["dcmiss"]) + stall
+            else:
+                stall = misses * (args.latency + words + 2)
+                cycles = int(row["cycles"]) - int(row["icmiss"]) + stall
             instret = int(row["instret"])
             writer.writerow([trace.stem, size, ways, line, policy, accesses, misses,
-                             writebacks, dstall, cycles, instret, f"{cycles / instret:.5f}"])
+                             writebacks, stall, cycles, instret, f"{cycles / instret:.5f}"])
     return 0
 
 

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Run programs on the core under Verilator and print one CSV row per run.
 
-measure.py [--cache SETS_BITS,WAYS,OFFSET_BITS ...] [--latency N ...] [--jobs N] hex...
+measure.py [--cache SETS_BITS,WAYS,OFFSET_BITS ...] [--icache SETS_BITS,WAYS]
+           [--latency N ...] [--jobs N] hex...
 
 Each data cache geometry gets its own Verilator build in build/vl/, with
 tb/probe.sv. Every program runs at every latency; the columns are the
@@ -23,12 +24,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MAX_CYCLES = 200_000_000
 RUN_TIMEOUT_S = 1800
+ICACHE = (7, 8)  # the core's default instruction cache: SETS_BITS, WAYS
 
 
-def build(cache: tuple[int, int, int]) -> Path:
-    """Build the testbench for one data cache geometry; return the binary."""
+def build(cache: tuple[int, int, int], icache: tuple[int, int]) -> Path:
+    """Build the testbench for one data and instruction cache geometry; return the binary."""
     index_bits, ways, offset_bits = cache
-    out = ROOT / "build" / "vl" / f"i{index_bits}w{ways}o{offset_bits}"
+    out = ROOT / "build" / "vl" / f"i{index_bits}w{ways}o{offset_bits}-i{icache[0]}w{icache[1]}"
     out.mkdir(parents=True, exist_ok=True)
     sources = [ROOT / "tb" / "tb.sv", ROOT / "tb" / "probe.sv",
                *sorted((ROOT / "rtl").glob("*.sv"))]
@@ -37,6 +39,7 @@ def build(cache: tuple[int, int, int]) -> Path:
          "-Wno-fatal", "-Wno-lint", "-Wno-style", "-Wno-INITIALDLY", "-Wno-MULTITOP",
          f"-GDCACHE_INDEX_BITS={index_bits}", f"-GDCACHE_WAYS={ways}",
          f"-GDCACHE_OFFSET_BITS={offset_bits}",
+         f"-GICACHE_INDEX_BITS={icache[0]}", f"-GICACHE_WAYS={icache[1]}",
          "-Mdir", str(out), "-o", "vtb", *map(str, sources)],
         check=True, stdout=subprocess.DEVNULL, timeout=600)
     return out / "vtb"
@@ -63,6 +66,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--cache", action="append", default=[],
                         help="SETS_BITS,WAYS,OFFSET_BITS (default 6,2,6)")
+    parser.add_argument("--icache", default=",".join(map(str, ICACHE)),
+                        help="instruction cache SETS_BITS,WAYS (default: the core's)")
     parser.add_argument("--latency", action="append", type=int, default=[])
     parser.add_argument("--jobs", type=int, default=6)
     parser.add_argument("--plusarg", action="append", default=[],
@@ -70,9 +75,10 @@ def main() -> int:
     parser.add_argument("hex", nargs="+")
     args = parser.parse_args()
     caches = [tuple(int(x) for x in c.split(",")) for c in args.cache] or [(6, 2, 6)]
+    icache = tuple(int(x) for x in args.icache.split(","))
     latencies = args.latency or [10]
 
-    binaries = {cache: build(cache) for cache in caches}
+    binaries = {cache: build(cache, icache) for cache in caches}
     jobs = [(cache, hex_file, latency)
             for cache in caches for hex_file in args.hex for latency in latencies]
     writer = None
@@ -93,7 +99,8 @@ def main() -> int:
                 failed = True
                 continue
             row = {"program": name, "sets_bits": cache[0], "ways": cache[1],
-                   "offset_bits": cache[2], "latency": latency,
+                   "offset_bits": cache[2], "isets_bits": icache[0], "iways": icache[1],
+                   "latency": latency,
                    **{k: v for k, v in fields.items() if k != "CPI"}}
             if writer is None:
                 writer = csv.DictWriter(sys.stdout, fieldnames=list(row))

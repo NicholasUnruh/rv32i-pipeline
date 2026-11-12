@@ -3,11 +3,12 @@ retired instructions and the bubbles that reached WB, by cause.
 
     uv run --with matplotlib python scripts/cpi_stack.py <build> <history>
 
-Needs `make tests bench` outputs in <build>. Steps 2 to 4 are rebuilt from the
-development history: <history> is a git ref whose log holds each step's commit,
+Needs `make tests bench` outputs in <build> for this checkout (step 6). Steps 2
+to 5 are rebuilt from the development history, programs included, since their
+memory map differs: <history> is a git ref whose log holds each step's commit,
 found by its subject (the public repository starts at the finished design, so it
-cannot rerun them). Step 5 is this checkout. tb/probe.sv tags every bubble that
-reaches WB with its cause (fill, load-use stall, flush, I-cache miss). Writes
+cannot rerun them). tb/probe.sv tags every lost cycle with its cause (fill,
+load-use stall, flush, I-cache miss, D-cache miss). Writes
 docs/img/cpi-stack.json and docs/img/cpi-stack.png.
 """
 
@@ -27,21 +28,28 @@ STEPS = [
         2,
         "Five\nstages",
         "Add a bare-metal C benchmark for CPI",
-        ["PROBE_NO_ICACHE", "PROBE_NO_TRACE"],
+        ["PROBE_NO_ICACHE", "PROBE_NO_TRACE", "PROBE_NO_DCACHE"],
         [],
     ),
     (
         3,
         "Branch\nprediction",
         "Predict branches with a BTB and 2-bit counters",
-        ["PROBE_NO_ICACHE", "PROBE_NO_TRACE"],
+        ["PROBE_NO_ICACHE", "PROBE_NO_TRACE", "PROBE_NO_DCACHE"],
         [],
     ),
-    (4, "I-cache\nL=10", "Fetch through a direct-mapped instruction cache", ["PROBE_NO_TRACE"], []),
-    (5, "Block RAM\nL=10", None, [], []),
-    (5, "Block RAM\nL=1 (board)", None, [], ["+imem_latency=1"]),
+    (
+        4,
+        "I-cache\nL=10",
+        "Fetch through a direct-mapped instruction cache",
+        ["PROBE_NO_TRACE", "PROBE_NO_DCACHE"],
+        [],
+    ),
+    (5, "Block RAM\nL=10", "Close timing on the DE1-SoC at 67.6 MHz", ["PROBE_NO_DCACHE"], []),
+    (6, "D-cache\nL=10", None, [], []),
+    (6, "D-cache\nL=1 (board)", None, [], ["+mem_latency=1"]),
 ]
-CAUSES = ["fill", "loaduse", "flush", "icmiss"]
+CAUSES = ["fill", "loaduse", "flush", "icmiss", "dcmiss"]
 STACK = re.compile(r"STACK cycles=(\d+) instret=(\d+) " + " ".join(rf"{c}=(\d+)" for c in CAUSES))
 
 
@@ -51,7 +59,10 @@ def git(*args: str) -> bytes:
     ).stdout
 
 
-def build_step(history: str, subject: str | None, defines: list[str], work: Path) -> Path:
+def build_step(
+    history: str, subject: str | None, defines: list[str], build: Path, work: Path
+) -> tuple[Path, Path]:
+    """Compile one step's core with the probe; return it and the step's programs."""
     src = ROOT
     if subject is not None:
         commits = (
@@ -65,10 +76,18 @@ def build_step(history: str, subject: str | None, defines: list[str], work: Path
         src.mkdir()
         subprocess.run(
             ["tar", "-x", "-C", str(src)],
-            input=git("archive", commits[0], "rtl", "tb"),
+            input=git("archive", commits[0], "Makefile", "rtl", "tb", "tests", "scripts"),
             check=True,
             timeout=60,
         )
+        subprocess.run(
+            ["make", "-C", str(src), "tests", "build/bench/bench.hex",
+             f"ISA={ROOT}/third_party/riscv-tests/isa"],
+            check=True,
+            capture_output=True,
+            timeout=600,
+        )
+        build = src / "build"
     vvp = work / f"{len(list(work.glob('*.vvp')))}.vvp"
     subprocess.run(
         [
@@ -89,7 +108,7 @@ def build_step(history: str, subject: str | None, defines: list[str], work: Path
         capture_output=True,
         timeout=120,
     )
-    return vvp
+    return vvp, build
 
 
 def run(vvp: Path, hexfile: Path, plusargs: list[str]) -> dict:
@@ -126,7 +145,13 @@ def plot(rows: list[dict], path: Path) -> None:
     import matplotlib.pyplot as plt
 
     bg, ink, muted, grid = "#0a0b12", "#f2f2f0", "#9a9aa6", "#2a2b36"
-    colors = {"base": "#5b5e70", "loaduse": "#3987e5", "flush": "#f07a45", "icmiss": "#199e70"}
+    colors = {
+        "base": "#5b5e70",
+        "loaduse": "#3987e5",
+        "flush": "#f07a45",
+        "icmiss": "#199e70",
+        "dcmiss": "#c94f9a",
+    }
     names = {
         "base": "Base: 1 per instruction, plus pipeline fill",
         "loaduse": "Load-use stall (at most {:.4f})".format(
@@ -134,6 +159,7 @@ def plot(rows: list[dict], path: Path) -> None:
         ),
         "flush": "Branch flush",
         "icmiss": "I-cache miss",
+        "dcmiss": "D-cache miss",
     }
     plt.rcParams.update(
         {
@@ -155,7 +181,7 @@ def plot(rows: list[dict], path: Path) -> None:
         ax.set_facecolor(bg)
         labels = [f"{r['step']}\n{r['title']}" for r in rows]
         bottom = [0.0] * len(rows)
-        for part in ["base", "loaduse", "flush", "icmiss"]:
+        for part in ["base", *CAUSES[1:]]:
             vals = []
             for r in rows:
                 p = r[key]["cpi_parts"]
@@ -191,7 +217,7 @@ def plot(rows: list[dict], path: Path) -> None:
         ax.set_ylim(0, max(bottom) * 1.12)
     handles, lbls = axes[0].get_legend_handles_labels()
     fig.legend(
-        handles, lbls, loc="lower center", ncol=4, frameon=False, fontsize=10, labelcolor=ink
+        handles, lbls, loc="lower center", ncol=3, frameon=False, fontsize=10, labelcolor=ink
     )
     fig.tight_layout(rect=(0, 0.08, 1, 1))
     fig.savefig(path, dpi=110, facecolor=bg)
@@ -201,8 +227,6 @@ def main() -> None:
     if len(sys.argv) != 3:
         sys.exit(__doc__)
     build, history = Path(sys.argv[1]).resolve(), sys.argv[2]
-    tests = sorted((build / "tests").glob("*.hex"))
-    bench = build / "bench/bench.hex"
     by_construction = {"cpi": 1.0, "cpi_parts": {"base": 1.0, **dict.fromkeys(CAUSES, 0.0)}}
     rows = [
         {
@@ -215,7 +239,9 @@ def main() -> None:
     ]
     with tempfile.TemporaryDirectory() as tmp:
         for step, title, subject, defines, plusargs in STEPS:
-            vvp = build_step(history, subject, defines, Path(tmp))
+            vvp, step_build = build_step(history, subject, defines, build, Path(tmp))
+            tests = sorted((step_build / "tests").glob("*.hex"))
+            bench = step_build / "bench/bench.hex"
             total = dict.fromkeys(["cycles", "instret", *CAUSES], 0)
             for t in tests:
                 for k, v in run(vvp, t, plusargs).items():
@@ -240,7 +266,7 @@ def main() -> None:
             {
                 "source": "scripts/cpi_stack.py",
                 "tests": len(tests),
-                "causes": "cycles = instret + fill + loaduse + flush + icmiss (bubbles at WB)",
+                "causes": "cycles = instret + fill + loaduse + flush + icmiss + dcmiss",
                 "steps": rows,
             },
             indent=1,

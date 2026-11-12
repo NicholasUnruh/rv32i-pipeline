@@ -1,7 +1,7 @@
 {
  "source": "scripts/cpi_stack.py",
  "tests": 40,
- "causes": "cycles = instret + fill + loaduse + flush + icmiss (bubbles at WB)",
+ "causes": "cycles = instret + fill + loaduse + flush + icmiss + dcmiss",
  "steps": [
   {
    "step": 1,
@@ -14,7 +14,8 @@
      "fill": 0.0,
      "loaduse": 0.0,
      "flush": 0.0,
-     "icmiss": 0.0
+     "icmiss": 0.0,
+     "dcmiss": 0.0
     }
    },
    "tests": {
@@ -24,7 +25,8 @@
      "fill": 0.0,
      "loaduse": 0.0,
      "flush": 0.0,
-     "icmiss": 0.0
+     "icmiss": 0.0,
+     "dcmiss": 0.0
     }
    }
   },
@@ -40,13 +42,15 @@
     "loaduse": 96,
     "flush": 10588,
     "icmiss": 0,
+    "dcmiss": 0,
     "cpi": 1.3026,
     "cpi_parts": {
      "base": 1.0,
      "fill": 0.0001,
      "loaduse": 0.0027,
      "flush": 0.2997,
-     "icmiss": 0.0
+     "icmiss": 0.0,
+     "dcmiss": 0.0
     }
    },
    "tests": {
@@ -56,13 +60,15 @@
     "loaduse": 154,
     "flush": 1050,
     "icmiss": 0,
+    "dcmiss": 0,
     "cpi": 1.1153,
     "cpi_parts": {
      "base": 1.0,
      "fill": 0.0135,
      "loaduse": 0.013,
      "flush": 0.0888,
-     "icmiss": 0.0
+     "icmiss": 0.0,
+     "dcmiss": 0.0
     }
    }
   },
@@ -78,13 +84,15 @@
     "loaduse": 96,
     "flush": 1626,
     "icmiss": 0,
+    "dcmiss": 0,
     "cpi": 1.0489,
     "cpi_parts": {
      "base": 1.0,
      "fill": 0.0001,
      "loaduse": 0.0027,
      "flush": 0.046,
-     "icmiss": 0.0
+     "icmiss": 0.0,
+     "dcmiss": 0.0
     }
    },
    "tests": {
@@ -94,13 +102,15 @@
     "loaduse": 154,
     "flush": 1050,
     "icmiss": 0,
+    "dcmiss": 0,
     "cpi": 1.1153,
     "cpi_parts": {
      "base": 1.0,
      "fill": 0.0135,
      "loaduse": 0.013,
      "flush": 0.0888,
-     "icmiss": 0.0
+     "icmiss": 0.0,
+     "dcmiss": 0.0
     }
    }
   },
@@ -116,13 +126,15 @@
     "loaduse": 96,
     "flush": 1626,
     "icmiss": 1864,
+    "dcmiss": 0,
     "cpi": 1.1016,
     "cpi_parts": {
      "base": 1.0,
      "fill": 0.0001,
      "loaduse": 0.0027,
      "flush": 0.046,
-     "icmiss": 0.0528
+     "icmiss": 0.0528,
+     "dcmiss": 0.0
     }
    },
    "tests": {
@@ -132,20 +144,22 @@
     "loaduse": 88,
     "flush": 1050,
     "icmiss": 33295,
+    "dcmiss": 0,
     "cpi": 3.9234,
     "cpi_parts": {
      "base": 1.0,
      "fill": 0.0135,
      "loaduse": 0.0074,
      "flush": 0.0887,
-     "icmiss": 2.8137
+     "icmiss": 2.8137,
+     "dcmiss": 0.0
     }
    }
   },
   {
    "step": 5,
    "title": "Block RAM\nL=10",
-   "source": "this checkout",
+   "source": "Close timing on the DE1-SoC at 67.6 MHz",
    "plusargs": [],
    "bench": {
     "cycles": 39038,
@@ -154,13 +168,15 @@
     "loaduse": 96,
     "flush": 1626,
     "icmiss": 1988,
+    "dcmiss": 0,
     "cpi": 1.1051,
     "cpi_parts": {
      "base": 1.0,
      "fill": 0.0001,
      "loaduse": 0.0027,
      "flush": 0.046,
-     "icmiss": 0.0563
+     "icmiss": 0.0563,
+     "dcmiss": 0.0
     }
    },
    "tests": {
@@ -170,53 +186,101 @@
     "loaduse": 88,
     "flush": 1050,
     "icmiss": 35623,
+    "dcmiss": 0,
     "cpi": 4.1262,
     "cpi_parts": {
      "base": 1.0,
      "fill": 0.0135,
      "loaduse": 0.0075,
      "flush": 0.0889,
-     "icmiss": 3.0163
+     "icmiss": 3.0163,
+     "dcmiss": 0.0
     }
    }
   },
   {
-   "step": 5,
-   "title": "Block RAM\nL=1 (board)",
+   "step": 6,
+   "title": "D-cache\nL=10",
    "source": "this checkout",
-   "plusargs": [
-    "+imem_latency=1"
-   ],
+   "plusargs": [],
    "bench": {
-    "cycles": 37913,
+    "cycles": 39561,
     "instret": 35324,
     "fill": 4,
     "loaduse": 96,
     "flush": 1626,
-    "icmiss": 863,
-    "cpi": 1.0733,
+    "icmiss": 1831,
+    "dcmiss": 680,
+    "cpi": 1.1199,
     "cpi_parts": {
      "base": 1.0,
      "fill": 0.0001,
      "loaduse": 0.0027,
      "flush": 0.046,
-     "icmiss": 0.0244
+     "icmiss": 0.0518,
+     "dcmiss": 0.0193
     }
    },
    "tests": {
-    "cycles": 28169,
-    "instret": 11810,
+    "cycles": 48830,
+    "instret": 11833,
     "fill": 160,
     "loaduse": 88,
     "flush": 1050,
-    "icmiss": 15061,
-    "cpi": 2.3852,
+    "icmiss": 35444,
+    "dcmiss": 255,
+    "cpi": 4.1266,
     "cpi_parts": {
      "base": 1.0,
      "fill": 0.0135,
-     "loaduse": 0.0075,
-     "flush": 0.0889,
-     "icmiss": 1.2753
+     "loaduse": 0.0074,
+     "flush": 0.0887,
+     "icmiss": 2.9954,
+     "dcmiss": 0.0215
+    }
+   }
+  },
+  {
+   "step": 6,
+   "title": "D-cache\nL=1 (board)",
+   "source": "this checkout",
+   "plusargs": [
+    "+mem_latency=1"
+   ],
+   "bench": {
+    "cycles": 38175,
+    "instret": 35324,
+    "fill": 4,
+    "loaduse": 96,
+    "flush": 1626,
+    "icmiss": 805,
+    "dcmiss": 320,
+    "cpi": 1.0807,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0001,
+     "loaduse": 0.0027,
+     "flush": 0.046,
+     "icmiss": 0.0228,
+     "dcmiss": 0.0091
+    }
+   },
+   "tests": {
+    "cycles": 28250,
+    "instret": 11833,
+    "fill": 160,
+    "loaduse": 88,
+    "flush": 1050,
+    "icmiss": 14999,
+    "dcmiss": 120,
+    "cpi": 2.3874,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0135,
+     "loaduse": 0.0074,
+     "flush": 0.0887,
+     "icmiss": 1.2676,
+     "dcmiss": 0.0101
     }
    }
   }

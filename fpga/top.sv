@@ -14,7 +14,7 @@ module top (
     output logic [6:0] HEX4,
     output logic [6:0] HEX5
 );
-  localparam logic [31:0] TOHOST = 32'h8000_FFF0;
+  localparam logic [31:0] TOHOST = 32'h4000_0000;  // I/O: not in RAM
 
   logic clk;
   assign clk = CLOCK_50;
@@ -29,7 +29,7 @@ module top (
   end
   assign rst_n = reset_sync[1];
 
-  logic imem_req, imem_rvalid, retire;
+  logic imem_req, imem_rvalid, dmem_req, dmem_rvalid, retire;
   logic [31:0] imem_rdata, dmem_wdata, dmem_rdata;
   // 64 KB of memory decodes only address bits [15:2]; the board does not count fetches.
   /* verilator lint_off UNUSEDSIGNAL */
@@ -38,50 +38,54 @@ module top (
   /* verilator lint_on UNUSEDSIGNAL */
   logic [3:0] dmem_wstrb;
 
-  core cpu (
+  core #(
+      .DCACHE_INDEX_BITS(5),
+      .DCACHE_WAYS(2),
+      .DCACHE_OFFSET_BITS(4)
+  ) cpu (
       .clk(clk),
       .rst_n(rst_n),
       .imem_req(imem_req),
       .imem_addr(imem_addr),
       .imem_rvalid(imem_rvalid),
       .imem_rdata(imem_rdata),
+      .dmem_req(dmem_req),
       .dmem_addr(dmem_addr),
+      .dmem_rvalid(dmem_rvalid),
+      .dmem_rdata(dmem_rdata),
       .dmem_wdata(dmem_wdata),
       .dmem_wstrb(dmem_wstrb),
-      .dmem_rdata(dmem_rdata),
       .fetch(fetch),
       .retire(retire)
   );
 
-  // Line fill: read the four words of the requested line on four cycles. Each
-  // word arrives the cycle after its address, so the first comes 2 cycles after
-  // the request.
-  logic [13:0] fill_word;
-  logic [2:0] fill_left;
+  // Port A refills instruction lines. Port B refills data lines and takes the
+  // data cache's word writes, which never overlap a refill; I/O writes skip RAM.
+  logic [13:0] ifill_word, dfill_word;
 
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      fill_word <= '0;
-      fill_left <= '0;
-      imem_rvalid <= 1'b0;
-    end else begin
-      imem_rvalid <= fill_left != 3'd0;
-      if (imem_req) begin
-        fill_word <= imem_addr[15:2];
-        fill_left <= 3'd4;
-      end else if (fill_left != 3'd0) begin
-        fill_word <= fill_word + 14'd1;
-        fill_left <= fill_left - 3'd1;
-      end
-    end
-  end
+  line_fill #(.LINE_WORDS(4)) ifill (
+      .clk(clk),
+      .rst_n(rst_n),
+      .req(imem_req),
+      .line_word(imem_addr[15:2]),
+      .word(ifill_word),
+      .rvalid(imem_rvalid)
+  );
+  line_fill #(.LINE_WORDS(4)) dfill (
+      .clk(clk),
+      .rst_n(rst_n),
+      .req(dmem_req),
+      .line_word(dmem_addr[15:2]),
+      .word(dfill_word),
+      .rvalid(dmem_rvalid)
+  );
 
   ram memory (
       .clk(clk),
-      .a_addr(fill_word),
+      .a_addr(ifill_word),
       .a_rdata(imem_rdata),
-      .b_addr(dmem_addr[15:2]),
-      .b_wstrb(dmem_wstrb),
+      .b_addr(dmem_wstrb != 4'b0 ? dmem_addr[15:2] : dfill_word),
+      .b_wstrb(dmem_addr[31] ? dmem_wstrb : 4'b0),
       .b_wdata(dmem_wdata),
       .b_rdata(dmem_rdata)
   );
@@ -99,7 +103,7 @@ module top (
     end else if (!done) begin
       cycles <= cycles + 24'd1;
       instret <= instret + {23'd0, retire};
-      if (dmem_wstrb != 4'b0 && {dmem_addr[31:2], 2'b00} == TOHOST) begin
+      if (dmem_wstrb != 4'b0 && dmem_addr == TOHOST) begin
         done <= 1'b1;
         passed <= dmem_wdata == 32'd1;
       end

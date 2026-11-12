@@ -3,13 +3,13 @@
 // `make bench` leave it out.
 //
 // +stack           print why every cycle that retired nothing was lost:
-//                  STACK cycles=N instret=M fill=F loaduse=L flush=B icmiss=I
+//                  STACK cycles=N instret=M fill=F loaduse=L flush=B icmiss=I dcmiss=D
 // +trace=<file>    one line per cycle: the PC in each stage, stall, flush,
 //                  forwarding and I-cache miss (format in scripts/pipeline_trace.py)
 // +vcd=<file> +vcd_from=A +vcd_to=B   dump this module's signals for cycles A..B
 //
-// Older steps of the core lack some signals: define PROBE_NO_ICACHE (steps 2 and 3)
-// and PROBE_NO_TRACE (steps 2 to 4).
+// Older steps of the core lack some signals: define PROBE_NO_ICACHE (steps 2 and 3),
+// PROBE_NO_TRACE (steps 2 to 4) and PROBE_NO_DCACHE (steps 2 to 5).
 module probe;
   // Why a pipeline register holds a bubble.
   typedef enum logic [2:0] {
@@ -17,7 +17,8 @@ module probe;
     FILL,     // reset: the pipeline has not filled yet
     LOADUSE,  // load-use stall
     FLUSH,    // misprediction in EX cleared IF/ID and ID/EX
-    ICMISS    // IF waited for an instruction cache line
+    ICMISS,   // IF waited for an instruction cache line
+    DCMISS    // MEM waited for a data cache line; every stage held
   } cause_t;
 
   wire clk = tb.clk;
@@ -31,6 +32,11 @@ module probe;
 `else
   wire icmiss = !tb.dut.cache_hit;
 `endif
+`ifdef PROBE_NO_DCACHE
+  wire dstall = 1'b0;
+`else
+  wire dstall = tb.dut.dstall;
+`endif
 
   // The cause carried by IF/ID, ID/EX, EX/MEM and MEM/WB, updated like the core's
   // own registers.
@@ -38,12 +44,14 @@ module probe;
   cause_t c_ex = FILL;
   cause_t c_mem = FILL;
   cause_t c_wb = FILL;
-  int lost[5];  // indexed by cause_t
+  int lost[6];  // indexed by cause_t
 
-  initial for (int i = 0; i < 5; i++) lost[i] = 0;
+  initial for (int i = 0; i < 6; i++) lost[i] = 0;
 
+  // A data miss holds every register, WB included, and nothing retires.
   always @(posedge clk)
-    if (rst_n && !done) begin
+    if (rst_n && !done && dstall) lost[DCMISS] <= lost[DCMISS] + 1;
+    else if (rst_n && !done) begin
       c_id <= flush ? FLUSH : stall ? c_id : icmiss ? ICMISS : INSTR;
       c_ex <= flush ? FLUSH : stall ? LOADUSE : c_id;
       c_mem <= c_ex;
@@ -53,9 +61,9 @@ module probe;
 
   final
     if ($test$plusargs("stack"))
-      $display("STACK cycles=%0d instret=%0d fill=%0d loaduse=%0d flush=%0d icmiss=%0d",
+      $display("STACK cycles=%0d instret=%0d fill=%0d loaduse=%0d flush=%0d icmiss=%0d dcmiss=%0d",
                tb.run_cycles, tb.instret, lost[FILL], lost[LOADUSE], lost[FLUSH],
-               lost[ICMISS]);
+               lost[ICMISS], lost[DCMISS]);
 
 `ifndef PROBE_NO_TRACE
   // Stage PCs for the trace and the waveform. EX/MEM and MEM/WB do not carry a PC,
@@ -78,7 +86,7 @@ module probe;
   wire ex_taken = v_ex && tb.dut.taken;
 
   always @(posedge clk)
-    if (rst_n) begin
+    if (rst_n && !dstall) begin
       pc_mem <= pc_ex;
       v_mem <= v_ex;
       pc_wb <= pc_mem;

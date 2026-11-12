@@ -34,8 +34,8 @@ build/tests/%.hex: build/tests/%.elf
 	$(RISCV)objcopy -O binary $< build/tests/$*.bin
 	python3 scripts/bin2hex.py build/tests/$*.bin $@
 
-# Runs every test on the core; fails unless all pass. Prints cycles and CPI per test
-# and in total.
+# Runs every test on the core; fails unless all pass. Prints cycles, CPI and cache
+# statistics per test and in total.
 sim: $(HEX) $(RTL) tb/tb.sv
 	iverilog -g2012 -s tb -o build/tb.vvp tb/tb.sv $(RTL)
 	rm -f build/sim.log
@@ -44,7 +44,7 @@ sim: $(HEX) $(RTL) tb/tb.sv
 			|| echo "FAIL build/tests/$$t.hex: no result" >> build/sim.log; \
 	done
 	cat build/sim.log
-	awk -F'[ =]' '/^PASS/ {c += $$4; i += $$6; f += $$10; m += $$12} END {if (i) printf "total cycles=%d instret=%d CPI=%.3f fetches=%d fills=%d hit_rate=%.4f\n", c, i, c / i, f, m, 1 - m / f}' build/sim.log
+	awk -F'[ =]' '/^PASS/ {c += $$4; i += $$6; f += $$10; m += $$12; a += $$14; h += $$16; w += $$20} END {if (i) printf "total cycles=%d instret=%d CPI=%.3f fetches=%d fills=%d ihit_rate=%.4f daccesses=%d dhit_rate=%.4f dwritebacks=%d\n", c, i, c / i, f, m, 1 - m / f, a, h / a, w}' build/sim.log
 	test "$$(grep -c '^PASS' build/sim.log)" -eq $(words $(TESTS))
 
 # Bare-metal C benchmark for CPI comparisons.

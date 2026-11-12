@@ -43,7 +43,7 @@ sim: $(HEX) $(RTL) tb/tb.sv
 			|| echo "FAIL build/tests/$$t.hex: no result" >> build/sim.log; \
 	done
 	cat build/sim.log
-	awk -F'[ =]' '/^PASS/ {c += $$4; i += $$6} END {if (i) printf "total cycles=%d instret=%d CPI=%.3f\n", c, i, c / i}' build/sim.log
+	awk -F'[ =]' '/^PASS/ {c += $$4; i += $$6; f += $$10; m += $$12} END {if (i) printf "total cycles=%d instret=%d CPI=%.3f fetches=%d fills=%d hit_rate=%.4f\n", c, i, c / i, f, m, 1 - m / f}' build/sim.log
 	test "$$(grep -c '^PASS' build/sim.log)" -eq $(words $(TESTS))
 
 # Bare-metal C benchmark for CPI comparisons.

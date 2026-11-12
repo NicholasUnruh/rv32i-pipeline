@@ -7,7 +7,7 @@ A five-stage pipelined RISC-V (RV32I) core in SystemVerilog, verified against th
 | 1 | [Single-cycle RV32I reference](docs/1-single-cycle.md) | 40/40 | CPI 1 |
 | 2 | [Five stages: forwarding, load-use stall, branch flush](docs/2-pipeline.md) | 40/40 | CPI 1.115 (all tests) |
 | 3 | [Branch prediction (BTB, 2-bit counters)](docs/3-branch-prediction.md) | 40/40 | C benchmark CPI 1.303 → 1.049 |
-| 4 | Instruction cache | — | — |
+| 4 | [Instruction cache, 10-cycle memory](docs/4-icache.md) | 40/40 | Benchmark hit rate 99.6%, CPI 1.102 |
 | 5 | Block RAM, timing closure and a program on the board | — | — |
 
 Each step must pass all 40 rv32ui tests (`fence_i` and `ma_data` excluded). Fmax comes from Quartus once memory is on-chip (step 5).

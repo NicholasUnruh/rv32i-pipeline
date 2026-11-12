@@ -3,16 +3,20 @@
 // - Load-use: an instruction that needs a load's result in EX waits one cycle in ID.
 // - Control: IF predicts with a BTB; branches and jumps resolve in EX, and a
 //   misprediction flushes IF and ID.
+// - Fetch: IF reads an instruction cache; a miss sends bubbles until the line is in.
 // Ports and the memory protocol are in docs/interface.md.
 module core (
     input  logic        clk,
     input  logic        rst_n,
+    output logic        imem_req,
     output logic [31:0] imem_addr,
+    input  logic        imem_rvalid,
     input  logic [31:0] imem_rdata,
     output logic [31:0] dmem_addr,
     output logic [31:0] dmem_wdata,
     output logic [3:0]  dmem_wstrb,
     input  logic [31:0] dmem_rdata,
+    output logic        fetch,       // IF passed an instruction to ID this cycle
     output logic        retire       // an instruction completed this cycle
 );
   localparam logic [31:0] RESET_PC = 32'h8000_0000;
@@ -69,12 +73,27 @@ module core (
   logic [31:0] pc;
   logic pred_taken;
   logic [31:0] pred_target;
+  logic cache_hit;
+  logic [31:0] cache_instr;
 
-  assign imem_addr = pc;
+  icache cache (
+      .clk(clk),
+      .rst_n(rst_n),
+      .pc(pc[31:2]),
+      .hit(cache_hit),
+      .instr(cache_instr),
+      .mem_req(imem_req),
+      .mem_addr(imem_addr),
+      .mem_rvalid(imem_rvalid),
+      .mem_rdata(imem_rdata)
+  );
+
+  assign fetch = cache_hit && !stall && !redirect;
+
   always_comb begin
-    if_id_next.valid = 1'b1;
+    if_id_next.valid = cache_hit;  // a miss sends a bubble
     if_id_next.pc = pc;
-    if_id_next.instr = imem_rdata;
+    if_id_next.instr = cache_instr;
     if_id_next.pred_taken = pred_taken;
     if_id_next.pred_target = pred_target;
   end
@@ -82,7 +101,7 @@ module core (
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) pc <= RESET_PC;
     else if (redirect) pc <= redirect_pc;
-    else if (!stall) pc <= pred_taken ? pred_target : pc + 32'd4;
+    else if (!stall && cache_hit) pc <= pred_taken ? pred_target : pc + 32'd4;
   end
 
   // ---------------------------------------------------------------- ID

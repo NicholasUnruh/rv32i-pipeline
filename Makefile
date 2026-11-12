@@ -11,8 +11,8 @@ TESTS := $(filter-out $(SKIP),$(basename $(notdir $(wildcard $(ISA)/rv32ui/*.S))
 HEX := $(TESTS:%=build/tests/%.hex)
 RTL := $(wildcard rtl/*.sv)
 
-# Run before every commit. Add sim, lint and synth once rtl/core.sv exists.
-check: tests
+# Run before every commit.
+check: sim lint synth
 
 toolchain:
 	test -x $(RISCV)gcc || (mkdir -p $(HOME)/.local/opt && \

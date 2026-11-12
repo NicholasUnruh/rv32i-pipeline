@@ -12,7 +12,7 @@ module core (
     output logic [31:0] imem_addr,
     input  logic        imem_rvalid,
     input  logic [31:0] imem_rdata,
-    output logic [31:0] dmem_addr,
+    output logic [31:0] dmem_addr,   // driven from EX; read data returns in MEM
     output logic [31:0] dmem_wdata,
     output logic [3:0]  dmem_wstrb,
     input  logic [31:0] dmem_rdata,
@@ -47,10 +47,9 @@ module core (
   typedef struct packed {
     logic        valid;
     logic [4:0]  rd;
-    logic        reg_write, mem_read, mem_write;
+    logic        reg_write, mem_read;
     logic [2:0]  funct3;
     logic [31:0] result;     // ALU result (the address for memory), or PC+4 for jumps
-    logic [31:0] store_val;  // rs2 after forwarding
   } ex_mem_t;
 
   typedef struct packed {
@@ -235,18 +234,18 @@ module core (
     ex_mem_next.rd = id_ex.rd;
     ex_mem_next.reg_write = id_ex.reg_write;
     ex_mem_next.mem_read = id_ex.mem_read;
-    ex_mem_next.mem_write = id_ex.mem_write;
     ex_mem_next.funct3 = id_ex.funct3;
     ex_mem_next.result = id_ex.jal || id_ex.jalr ? pc_plus4 : alu_y;
-    ex_mem_next.store_val = fwd_b;
   end
 
-  // ---------------------------------------------------------------- MEM
-  assign dmem_addr = ex_mem.result;
-  assign dmem_wdata = store_data(ex_mem.funct3[1:0], ex_mem.store_val);
-  assign dmem_wstrb = ex_mem.mem_write ? store_strobe(ex_mem.funct3[1:0], ex_mem.result[1:0])
-                                       : 4'b0;
+  // Data memory is synchronous (block RAM): EX sends the address and any store,
+  // and a load's word comes back during MEM. The instruction in EX is never
+  // flushed or stalled, so a store issued here always commits.
+  assign dmem_addr = alu_y;
+  assign dmem_wdata = store_data(id_ex.funct3[1:0], fwd_b);
+  assign dmem_wstrb = id_ex.mem_write ? store_strobe(id_ex.funct3[1:0], alu_y[1:0]) : 4'b0;
 
+  // ---------------------------------------------------------------- MEM
   always_comb begin
     mem_wb_next.valid = ex_mem.valid;
     mem_wb_next.rd = ex_mem.rd;

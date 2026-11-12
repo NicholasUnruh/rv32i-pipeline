@@ -4,12 +4,12 @@
 
 `rtl/icache.sv`: direct-mapped, 64 lines of 16 bytes (1 KB), indexed by `pc[9:4]` with a 22-bit tag. Lookup is combinational, so a hit costs nothing.
 
-Instruction memory is now multi-cycle (`docs/interface.md`): one request returns the line's four words on consecutive cycles, `L` cycles later (`+imem_latency`, default 10).
+Instruction memory is now multi-cycle (`docs/interface.md`): a request in cycle k returns the line's four words in cycles k+L+1 to k+L+4 (`+imem_latency=L`, default 10).
 
 - On a miss the cache raises `imem_req` for one cycle, clears the line's valid bit and writes each word as it arrives. The line becomes valid after the fourth word, so a half-filled line never hits.
 - While the line is missing, IF holds the PC and sends bubbles to ID; EX, MEM and WB keep draining.
 - A redirect during a fill moves the PC. The fill still completes, and other lines can hit meanwhile; the new PC requests its own line afterwards.
-- A miss costs about `L + 4` cycles: the request cycle, the latency and four words.
+- A miss costs up to `L + 5` cycles: the request, the latency, four words, then the hit. Measured: 5.4 cycles per fill at L = 1, 13.5 at L = 10, because the back end keeps draining.
 
 ## Hazards
 

@@ -1,4 +1,4 @@
-.PHONY: check tests sim bench lint synth toolchain clean
+.PHONY: check tests sim bench lint synth build program toolchain clean
 
 XPACK := xpack-riscv-none-elf-gcc-15.2.0-1
 XPACK_URL := https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases/download/v15.2.0-1/$(XPACK)-linux-x64.tar.gz
@@ -10,6 +10,7 @@ SKIP := fence_i ma_data
 TESTS := $(filter-out $(SKIP),$(basename $(notdir $(wildcard $(ISA)/rv32ui/*.S))))
 HEX := $(TESTS:%=build/tests/%.hex)
 RTL := $(wildcard rtl/*.sv)
+QUARTUS := build/quartus
 
 # Run before every commit.
 check: sim bench lint synth
@@ -63,10 +64,25 @@ bench: build/bench/bench.hex $(RTL) tb/tb.sv
 
 lint:
 	verilator --lint-only -Wall --top-module core $(RTL)
+	verilator --lint-only -Wall --top-module top $(RTL) $(wildcard fpga/*.sv)
 
 synth:
 	mkdir -p build
 	yosys -q -l build/synth.log -p 'read_verilog -sv $(RTL); synth_intel_alm -family cyclonev -top core; stat'
+
+# Quartus compile for the DE1-SoC with the C benchmark in block RAM; fails on any
+# timing violation or misplaced pin.
+build: build/bench/bench.hex
+	mkdir -p $(QUARTUS)
+	cp quartus/* $(QUARTUS)/
+	cp build/bench/bench.hex $(QUARTUS)/program.hex
+	cd $(QUARTUS) && quartus_sh --flow compile rv32i
+	python3 scripts/quartus_gate.py timing $(QUARTUS)/output_files/rv32i.sta.rpt
+	python3 scripts/quartus_gate.py pins $(QUARTUS)/output_files/rv32i.pin quartus/rv32i.qsf
+
+# The HPS is device 1 on the JTAG chain; the FPGA is device 2.
+program:
+	quartus_pgm --mode=jtag --cable=1 -o "p;$(QUARTUS)/output_files/rv32i.sof@2"
 
 clean:
 	rm -rf build

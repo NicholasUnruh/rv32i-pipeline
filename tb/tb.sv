@@ -16,7 +16,7 @@ module tb;
   logic [31:0] imem_addr, imem_rdata, dmem_addr, dmem_wdata, dmem_rdata;
   logic [3:0] dmem_wstrb;
   string hex;
-  int imem_latency = 10;  // cycles from a line request to its first word
+  int imem_latency = 10;  // extra cycles before a requested line's first word
   int cycles = 0;
   // Counted from reset release
   int run_cycles = 0;
@@ -47,12 +47,11 @@ module tb;
     return (addr - BASE) >> 2;
   endfunction
 
-  assign dmem_rdata = in_range(dmem_addr) ? mem[word(dmem_addr)] : 32'hx;
 
   always #5 clk = ~clk;
 
-  // Instruction memory: a line request returns the line's four words on four
-  // consecutive cycles, the first imem_latency cycles after the request.
+  // Instruction memory: a line request in cycle k returns the line's four words in
+  // cycles k+imem_latency+1 to k+imem_latency+4.
   logic [31:0] fill_addr;
   int fill_wait = 0;
   int fill_left = 0;
@@ -93,6 +92,8 @@ module tb;
       for (int b = 0; b < 4; b++)
         if (dmem_wstrb[b]) mem[word(dmem_addr)][8*b+:8] <= dmem_wdata[8*b+:8];
     end
+    // Data reads are synchronous: the word at this cycle's address, next cycle.
+    dmem_rdata <= in_range(dmem_addr) ? mem[word(dmem_addr)] : 32'hx;
     cycles <= cycles + 1;
     if (rst_n) begin
       run_cycles <= run_cycles + 1;

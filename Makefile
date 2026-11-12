@@ -33,15 +33,17 @@ build/tests/%.hex: build/tests/%.elf
 	$(RISCV)objcopy -O binary $< build/tests/$*.bin
 	python3 scripts/bin2hex.py build/tests/$*.bin $@
 
-# Runs every test on the core; fails unless all pass.
+# Runs every test on the core; fails unless all pass. Prints cycles and CPI per test
+# and in total.
 sim: $(HEX) $(RTL) tb/tb.sv
 	iverilog -g2012 -s tb -o build/tb.vvp tb/tb.sv $(RTL)
 	rm -f build/sim.log
 	for t in $(TESTS); do \
-		timeout 60 vvp -n build/tb.vvp +hex=build/tests/$$t.hex | grep -m1 -E '^(PASS|FAIL)' >> build/sim.log \
+		timeout 60 vvp -n build/tb.vvp +hex=build/tests/$$t.hex | grep -m1 -E '^(PASS|FAIL|ERROR)' >> build/sim.log \
 			|| echo "FAIL build/tests/$$t.hex: no result" >> build/sim.log; \
 	done
 	cat build/sim.log
+	awk -F'[ =]' '/^PASS/ {c += $$4; i += $$6} END {if (i) printf "total cycles=%d instret=%d CPI=%.3f\n", c, i, c / i}' build/sim.log
 	test "$$(grep -c '^PASS' build/sim.log)" -eq $(words $(TESTS))
 
 lint:

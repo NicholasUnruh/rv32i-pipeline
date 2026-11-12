@@ -1,5 +1,6 @@
 // 32 x 32-bit register file: two combinational reads, one write on the clock edge.
-// x0 always reads zero.
+// x0 always reads zero. A read of the register being written returns the new value,
+// so an instruction in decode sees the result of the one in writeback.
 module regfile (
     input  logic        clk,
     input  logic [4:0]  raddr1,
@@ -14,6 +15,6 @@ module regfile (
 
   always_ff @(posedge clk) if (we && waddr != 5'd0) regs[waddr] <= wdata;
 
-  assign rdata1 = raddr1 == 5'd0 ? 32'b0 : regs[raddr1];
-  assign rdata2 = raddr2 == 5'd0 ? 32'b0 : regs[raddr2];
+  assign rdata1 = raddr1 == 5'd0 ? 32'b0 : we && waddr == raddr1 ? wdata : regs[raddr1];
+  assign rdata2 = raddr2 == 5'd0 ? 32'b0 : we && waddr == raddr2 ? wdata : regs[raddr2];
 endmodule

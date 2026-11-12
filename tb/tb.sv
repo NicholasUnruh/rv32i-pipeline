@@ -1,4 +1,5 @@
-// Runs one riscv-tests program on `core`: +hex=<file>. Prints one PASS or FAIL line.
+// Runs one riscv-tests program on `core`: +hex=<file>. Prints one PASS or FAIL line
+// with the cycles and retired instructions from reset release to the tohost store.
 `timescale 1ns / 1ps
 
 module tb;
@@ -12,8 +13,11 @@ module tb;
   logic [31:0] mem[WORDS];
   logic [31:0] imem_addr, imem_rdata, dmem_addr, dmem_wdata, dmem_rdata;
   logic [3:0] dmem_wstrb;
+  logic retire;
   string hex;
   int cycles = 0;
+  int run_cycles = 0;  // cycles since reset release
+  int instret = 0;     // instructions retired since reset release
 
   core dut (
       .clk(clk),
@@ -23,7 +27,8 @@ module tb;
       .dmem_addr(dmem_addr),
       .dmem_wdata(dmem_wdata),
       .dmem_wstrb(dmem_wstrb),
-      .dmem_rdata(dmem_rdata)
+      .dmem_rdata(dmem_rdata),
+      .retire(retire)
   );
 
   function automatic logic in_range(logic [31:0] addr);
@@ -42,7 +47,9 @@ module tb;
   always @(posedge clk) begin
     if (rst_n && dmem_wstrb != 4'b0) begin
       if ((dmem_addr & ~32'h3) == TOHOST) begin
-        if (dmem_wdata == 32'd1) $display("PASS %s", hex);
+        if (dmem_wdata == 32'd1)
+          $display("PASS %s cycles=%0d instret=%0d CPI=%0.3f", hex, run_cycles, instret,
+                   real'(run_cycles) / instret);
         else $display("FAIL %s: test %0d", hex, dmem_wdata >> 1);
         $finish;
       end
@@ -54,6 +61,10 @@ module tb;
         if (dmem_wstrb[b]) mem[word(dmem_addr)][8*b+:8] <= dmem_wdata[8*b+:8];
     end
     cycles <= cycles + 1;
+    if (rst_n) begin
+      run_cycles <= run_cycles + 1;
+      instret <= instret + int'(retire);
+    end
     if (cycles >= MAX_CYCLES) begin
       $display("FAIL %s: no result in %0d cycles", hex, MAX_CYCLES);
       $finish;

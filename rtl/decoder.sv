@@ -5,6 +5,8 @@ module decoder (
     output logic [4:0]  rs1,
     output logic [4:0]  rs2,
     output logic [4:0]  rd,
+    output logic        uses_rs1,   // the instruction reads rs1 (for hazard checks)
+    output logic        uses_rs2,
     output logic [31:0] imm,
     output logic [3:0]  alu_op,     // {funct7[5], funct3}; see alu.sv
     output logic        alu_a_pc,   // ALU input a is the PC (auipc)
@@ -41,6 +43,10 @@ module decoder (
   assign rd = instr[11:7];
   assign rs1 = instr[19:15];
   assign rs2 = instr[24:20];
+
+  assign uses_rs1 = opcode == OP_JALR || opcode == OP_BRANCH || opcode == OP_LOAD
+      || opcode == OP_STORE || opcode == OP_IMM || opcode == OP_REG;
+  assign uses_rs2 = opcode == OP_BRANCH || opcode == OP_STORE || opcode == OP_REG;
 
   assign imm_i = {{21{instr[31]}}, instr[30:20]};
   assign imm_s = {{21{instr[31]}}, instr[30:25], instr[11:7]};

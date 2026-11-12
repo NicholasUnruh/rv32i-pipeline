@@ -18,6 +18,10 @@ The decoder reports which source registers an instruction reads, so `lui`, `auip
 
 Simulation assertions check that no illegal instruction reaches EX and that a load in MEM never feeds EX; disabling the stall trips the second in `lw`.
 
+![Load-use stall, forward and flush](img/hazard-wave.svg)
+
+*The final core on the C benchmark: `bnez` mispredicts in EX and flushes two slots; `beqz` waits a cycle for `lw a5`, then takes it from MEM/WB.* `tb/probe.sv` records it (`scripts/pipeline_trace.py`, `scripts/waveform.py`), with a 30-cycle stage-by-stage trace in `img/pipeline-trace.json`.
+
 ## Measured
 
 `make sim`, all 40 tests (cycles from reset release to the `tohost` store):

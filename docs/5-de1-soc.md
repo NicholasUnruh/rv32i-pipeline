@@ -24,6 +24,10 @@ All corners meet timing (hold +0.126 ns). Critical path, 14.2 ns: MEM/WB `rd`, f
 
 Simulation: 40/40 tests; benchmark CPI 1.105 at 10-cycle latency. The board top, simulated with its RAM, passes the benchmark in 37,914 cycles (CPI 1.073).
 
+![Resources per step](img/fpga-resources.png)
+
+*Synchronous arrays cut the fitted design from 9,124 to 1,822 ALMs for 0.84 MHz of Fmax (`scripts/fpga_resources.py`).*
+
 ## Limitations
 
 The bitstream meets timing but has not yet run on the board; `make build program` loads it.

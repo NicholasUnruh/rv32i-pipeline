@@ -10,6 +10,10 @@ A five-stage pipelined RISC-V (RV32I) core in SystemVerilog, verified against th
 | 4 | [Instruction cache, 10-cycle memory](docs/4-icache.md) | 40/40 | Benchmark hit rate 99.6%, CPI 1.102 |
 | 5 | [Block RAM and timing closure on the DE1-SoC](docs/5-de1-soc.md) | 40/40 | Fmax 67.61 MHz, 1,822 ALMs |
 
+![CPI stack per step](docs/img/cpi-stack.png)
+
+*Where the cycles go: every bubble that reached WB, by cause, rerun per step (`scripts/cpi_stack.py`).*
+
 ## Why it matters
 
 Each step adds one microarchitectural mechanism and measures what it buys: CPI from simulated cycle counts, Fmax from Quartus timing analysis. Flush cost, prediction accuracy, miss penalty and critical path are measured, not estimated.
@@ -32,12 +36,12 @@ make program     # load the bitstream over USB-Blaster
 | Path | Contents |
 |---|---|
 | `rtl/` | Core, decoder, ALU, register file, BTB, instruction cache |
-| `tb/` | Testbench with memory model and CPI counters |
+| `tb/` | Testbench with memory model and CPI counters; probe for traces |
 | `fpga/` | DE1-SoC top, dual-port block RAM, seven-segment driver |
 | `quartus/` | Project, pin assignments, timing constraints |
 | `tests/env/` | Bare-metal environment for riscv-tests (no CSRs or traps) |
 | `tests/bench/` | C benchmark for CPI comparisons |
-| `scripts/` | Hex conversion, Quartus timing and pin gate |
+| `scripts/` | Hex conversion, Quartus gate, figures in `docs/img/` |
 | `third_party/riscv-tests/` | Official test suite (unmodified submodule) |
 | `docs/` | One design note per step, core interface |
 

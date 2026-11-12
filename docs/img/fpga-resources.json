@@ -1,0 +1,71 @@
+{
+ "source": "scripts/fpga_resources.py",
+ "device": "Cyclone V 5CSEMA5F31C6",
+ "yosys": [
+  {
+   "aluts": 743,
+   "carry": 225,
+   "ffs": 32,
+   "mlab": 64,
+   "source": "docs/1-single-cycle.md",
+   "step": 1,
+   "title": "Single-cycle"
+  },
+  {
+   "aluts": 1127,
+   "carry": 257,
+   "ffs": 372,
+   "mlab": null,
+   "source": "docs/2-pipeline.md",
+   "step": 2,
+   "title": "Five stages"
+  },
+  {
+   "aluts": 1389,
+   "carry": 266,
+   "ffs": 502,
+   "mlab": 230,
+   "source": "docs/3-branch-prediction.md",
+   "step": 3,
+   "title": "Branch prediction"
+  },
+  {
+   "aluts": 1722,
+   "carry": 284,
+   "ffs": 575,
+   "mlab": 530,
+   "source": "docs/4-icache.md",
+   "step": 4,
+   "title": "I-cache"
+  },
+  {
+   "aluts": 1744,
+   "carry": 251,
+   "ffs": 673,
+   "mlab": 64,
+   "m10k": 4,
+   "source": "build/synth.log (make synth)",
+   "step": 5,
+   "title": "Block RAM"
+  }
+ ],
+ "quartus": {
+  "async": {
+   "alms": 9124,
+   "registers": 15076,
+   "m10k": 128,
+   "fmax_mhz": 68.45,
+   "setup_slack_ns": 5.39,
+   "source": "docs/5-de1-soc.md"
+  },
+  "sync": {
+   "alms": 1822,
+   "registers": 1826,
+   "m10k": 132,
+   "fmax_mhz": 67.61,
+   "setup_slack_ns": 5.209,
+   "worst_hold_slack_ns": 0.126,
+   "source": "build/quartus/output_files/rv32i.fit.summary, rv32i.sta.rpt"
+  }
+ }
+}

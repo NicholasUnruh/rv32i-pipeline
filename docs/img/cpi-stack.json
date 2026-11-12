@@ -1,0 +1,224 @@
+{
+ "source": "scripts/cpi_stack.py",
+ "tests": 40,
+ "causes": "cycles = instret + fill + loaduse + flush + icmiss (bubbles at WB)",
+ "steps": [
+  {
+   "step": 1,
+   "title": "Single-\ncycle",
+   "note": "CPI 1 by construction (docs/1-single-cycle.md); not simulated",
+   "bench": {
+    "cpi": 1.0,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0,
+     "loaduse": 0.0,
+     "flush": 0.0,
+     "icmiss": 0.0
+    }
+   },
+   "tests": {
+    "cpi": 1.0,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0,
+     "loaduse": 0.0,
+     "flush": 0.0,
+     "icmiss": 0.0
+    }
+   }
+  },
+  {
+   "step": 2,
+   "title": "Five\nstages",
+   "source": "Add a bare-metal C benchmark for CPI",
+   "plusargs": [],
+   "bench": {
+    "cycles": 46012,
+    "instret": 35324,
+    "fill": 4,
+    "loaduse": 96,
+    "flush": 10588,
+    "icmiss": 0,
+    "cpi": 1.3026,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0001,
+     "loaduse": 0.0027,
+     "flush": 0.2997,
+     "icmiss": 0.0
+    }
+   },
+   "tests": {
+    "cycles": 13191,
+    "instret": 11827,
+    "fill": 160,
+    "loaduse": 154,
+    "flush": 1050,
+    "icmiss": 0,
+    "cpi": 1.1153,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0135,
+     "loaduse": 0.013,
+     "flush": 0.0888,
+     "icmiss": 0.0
+    }
+   }
+  },
+  {
+   "step": 3,
+   "title": "Branch\nprediction",
+   "source": "Predict branches with a BTB and 2-bit counters",
+   "plusargs": [],
+   "bench": {
+    "cycles": 37050,
+    "instret": 35324,
+    "fill": 4,
+    "loaduse": 96,
+    "flush": 1626,
+    "icmiss": 0,
+    "cpi": 1.0489,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0001,
+     "loaduse": 0.0027,
+     "flush": 0.046,
+     "icmiss": 0.0
+    }
+   },
+   "tests": {
+    "cycles": 13191,
+    "instret": 11827,
+    "fill": 160,
+    "loaduse": 154,
+    "flush": 1050,
+    "icmiss": 0,
+    "cpi": 1.1153,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0135,
+     "loaduse": 0.013,
+     "flush": 0.0888,
+     "icmiss": 0.0
+    }
+   }
+  },
+  {
+   "step": 4,
+   "title": "I-cache\nL=10",
+   "source": "Fetch through a direct-mapped instruction cache",
+   "plusargs": [],
+   "bench": {
+    "cycles": 38914,
+    "instret": 35324,
+    "fill": 4,
+    "loaduse": 96,
+    "flush": 1626,
+    "icmiss": 1864,
+    "cpi": 1.1016,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0001,
+     "loaduse": 0.0027,
+     "flush": 0.046,
+     "icmiss": 0.0528
+    }
+   },
+   "tests": {
+    "cycles": 46426,
+    "instret": 11833,
+    "fill": 160,
+    "loaduse": 88,
+    "flush": 1050,
+    "icmiss": 33295,
+    "cpi": 3.9234,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0135,
+     "loaduse": 0.0074,
+     "flush": 0.0887,
+     "icmiss": 2.8137
+    }
+   }
+  },
+  {
+   "step": 5,
+   "title": "Block RAM\nL=10",
+   "source": "this checkout",
+   "plusargs": [],
+   "bench": {
+    "cycles": 39038,
+    "instret": 35324,
+    "fill": 4,
+    "loaduse": 96,
+    "flush": 1626,
+    "icmiss": 1988,
+    "cpi": 1.1051,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0001,
+     "loaduse": 0.0027,
+     "flush": 0.046,
+     "icmiss": 0.0563
+    }
+   },
+   "tests": {
+    "cycles": 48731,
+    "instret": 11810,
+    "fill": 160,
+    "loaduse": 88,
+    "flush": 1050,
+    "icmiss": 35623,
+    "cpi": 4.1262,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0135,
+     "loaduse": 0.0075,
+     "flush": 0.0889,
+     "icmiss": 3.0163
+    }
+   }
+  },
+  {
+   "step": 5,
+   "title": "Block RAM\nL=1 (board)",
+   "source": "this checkout",
+   "plusargs": [
+    "+imem_latency=1"
+   ],
+   "bench": {
+    "cycles": 37913,
+    "instret": 35324,
+    "fill": 4,
+    "loaduse": 96,
+    "flush": 1626,
+    "icmiss": 863,
+    "cpi": 1.0733,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0001,
+     "loaduse": 0.0027,
+     "flush": 0.046,
+     "icmiss": 0.0244
+    }
+   },
+   "tests": {
+    "cycles": 28169,
+    "instret": 11810,
+    "fill": 160,
+    "loaduse": 88,
+    "flush": 1050,
+    "icmiss": 15061,
+    "cpi": 2.3852,
+    "cpi_parts": {
+     "base": 1.0,
+     "fill": 0.0135,
+     "loaduse": 0.0075,
+     "flush": 0.0889,
+     "icmiss": 1.2753
+    }
+   }
+  }
+ ]
+}

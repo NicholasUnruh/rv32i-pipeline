@@ -6,7 +6,7 @@ A five-stage pipelined RISC-V (RV32I) core in SystemVerilog, verified against th
 |---|---|---|---|
 | 1 | [Single-cycle RV32I reference](docs/1-single-cycle.md) | 40/40 | CPI 1 |
 | 2 | [Five stages: forwarding, load-use stall, branch flush](docs/2-pipeline.md) | 40/40 | CPI 1.115 (all tests) |
-| 3 | Branch prediction (BTB, 2-bit counters) | — | — |
+| 3 | [Branch prediction (BTB, 2-bit counters)](docs/3-branch-prediction.md) | 40/40 | C benchmark CPI 1.303 → 1.049 |
 | 4 | Instruction cache | — | — |
 | 5 | Block RAM, timing closure and a program on the board | — | — |
 

@@ -1,7 +1,8 @@
 // Five-stage pipelined RV32I core: IF, ID, EX, MEM, WB.
 // - Forwarding: EX takes operands from the instructions in MEM and WB.
 // - Load-use: an instruction that needs a load's result in EX waits one cycle in ID.
-// - Control: branches and jumps resolve in EX; a taken one flushes IF and ID.
+// - Control: IF predicts with a BTB; branches and jumps resolve in EX, and a
+//   misprediction flushes IF and ID.
 // Ports and the memory protocol are in docs/interface.md.
 module core (
     input  logic        clk,
@@ -21,11 +22,15 @@ module core (
     logic        valid;
     logic [31:0] pc;
     logic [31:0] instr;
+    logic        pred_taken;   // IF's prediction, checked in EX
+    logic [31:0] pred_target;
   } if_id_t;
 
   typedef struct packed {
     logic        valid;
     logic [31:0] pc;
+    logic        pred_taken;
+    logic [31:0] pred_target;
     logic [4:0]  rs1, rs2, rd;
     logic        uses_rs1, uses_rs2;
     logic [31:0] rs1_val, rs2_val, imm;
@@ -57,23 +62,27 @@ module core (
   mem_wb_t mem_wb, mem_wb_next;
 
   logic stall;     // load-use hazard: hold IF and ID, send a bubble to EX
-  logic redirect;  // taken branch or jump in EX: flush IF and ID
+  logic redirect;  // misprediction in EX: flush IF and ID
   logic [31:0] redirect_pc;
 
   // ---------------------------------------------------------------- IF
   logic [31:0] pc;
+  logic pred_taken;
+  logic [31:0] pred_target;
 
   assign imem_addr = pc;
   always_comb begin
     if_id_next.valid = 1'b1;
     if_id_next.pc = pc;
     if_id_next.instr = imem_rdata;
+    if_id_next.pred_taken = pred_taken;
+    if_id_next.pred_target = pred_target;
   end
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) pc <= RESET_PC;
     else if (redirect) pc <= redirect_pc;
-    else if (!stall) pc <= pc + 32'd4;
+    else if (!stall) pc <= pred_taken ? pred_target : pc + 32'd4;
   end
 
   // ---------------------------------------------------------------- ID
@@ -128,6 +137,8 @@ module core (
     if (if_id.valid && !stall) begin
       id_ex_next.valid = 1'b1;
       id_ex_next.pc = if_id.pc;
+      id_ex_next.pred_taken = if_id.pred_taken;
+      id_ex_next.pred_target = if_id.pred_target;
       id_ex_next.rs1 = rs1;
       id_ex_next.rs2 = rs2;
       id_ex_next.rd = rd;
@@ -154,7 +165,8 @@ module core (
   // ---------------------------------------------------------------- EX
   logic a_from_mem, a_from_wb, b_from_mem, b_from_wb;
   logic [31:0] fwd_a, fwd_b, alu_a, alu_b, alu_y;
-  logic taken;
+  logic is_control, taken;
+  logic [31:0] target, pc_plus4;
 
   // Forwarding: take the youngest in-flight write to rs (MEM before WB), else the
   // value read in ID. reg_write is never set for rd = x0.
@@ -176,9 +188,28 @@ module core (
       .y(alu_y)
   );
 
-  assign taken = id_ex.branch && branch_taken(id_ex.funct3, fwd_a, fwd_b);
-  assign redirect = taken || id_ex.jal || id_ex.jalr;
-  assign redirect_pc = id_ex.jalr ? (fwd_a + id_ex.imm) & ~32'd1 : id_ex.pc + id_ex.imm;
+  // Resolve control flow and check IF's guess: direction, and target when taken.
+  // Any instruction can be mispredicted if the BTB says taken, so check them all.
+  assign is_control = id_ex.branch || id_ex.jal || id_ex.jalr;
+  assign taken = id_ex.jal || id_ex.jalr
+      || (id_ex.branch && branch_taken(id_ex.funct3, fwd_a, fwd_b));
+  assign target = id_ex.jalr ? (fwd_a + id_ex.imm) & ~32'd1 : id_ex.pc + id_ex.imm;
+  assign pc_plus4 = id_ex.pc + 32'd4;
+  assign redirect = id_ex.valid && (taken != id_ex.pred_taken
+                                    || (taken && target != id_ex.pred_target));
+  assign redirect_pc = taken ? target : pc_plus4;
+
+  btb predictor (
+      .clk(clk),
+      .rst_n(rst_n),
+      .lookup_pc(pc[31:2]),
+      .predict_taken(pred_taken),
+      .predict_target(pred_target),
+      .update(id_ex.valid && is_control),
+      .update_pc(id_ex.pc[31:2]),
+      .update_taken(taken),
+      .update_target(target)
+  );
 
   always_comb begin
     ex_mem_next.valid = id_ex.valid;
@@ -187,7 +218,7 @@ module core (
     ex_mem_next.mem_read = id_ex.mem_read;
     ex_mem_next.mem_write = id_ex.mem_write;
     ex_mem_next.funct3 = id_ex.funct3;
-    ex_mem_next.result = id_ex.jal || id_ex.jalr ? id_ex.pc + 32'd4 : alu_y;
+    ex_mem_next.result = id_ex.jal || id_ex.jalr ? pc_plus4 : alu_y;
     ex_mem_next.store_val = fwd_b;
   end
 

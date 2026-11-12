@@ -1,0 +1,38 @@
+# Checks the properties in dcache_formal.sv for a 2-set, 2-way cache with 8-byte
+# lines. From formal/: `sby -f dcache.sby <task>`. Results: docs/formal.md.
+#   prove  unbounded proof (PDR)
+#   bmc    every property for the first 40 cycles
+#   reach  a trace where A goes through a dirty writeback and is read back
+#          (expected to FAIL: the counterexample is the witness)
+#   cover  the longest stall is reachable
+[tasks]
+prove
+bmc
+reach
+cover
+
+[options]
+prove: mode prove
+bmc: mode bmc
+bmc: depth 40
+reach: mode bmc
+reach: depth 40
+cover: mode cover
+cover: depth 30
+
+[engines]
+prove: abc pdr
+bmc: abc bmc3
+reach: abc bmc3
+cover: smtbmc yices
+
+[script]
+read_verilog -sv -formal dcache.sv
+~reach: read_verilog -sv -formal dcache_formal.sv
+reach: read_verilog -sv -formal -DREACH dcache_formal.sv
+prep -top dcache_formal
+async2sync
+
+[files]
+../rtl/dcache.sv
+dcache_formal.sv

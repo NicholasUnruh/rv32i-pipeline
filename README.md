@@ -45,6 +45,7 @@ make program     # load the bitstream over USB-Blaster
 | `tests/env/` | Bare-metal environment for riscv-tests (no CSRs or traps) |
 | `tests/bench/` | C benchmark for CPI comparisons |
 | `tests/embench/` | Embench-IoT start-up and board support |
+| `formal/` | SymbiYosys harness for the data cache |
 | `scripts/` | Hex conversion, Verilator measurement runner, Quartus gate, figures in `docs/img/` |
 | `results/` | Measured CSVs behind the step notes |
 | `third_party/` | riscv-tests and Embench-IoT 1.0 (unmodified submodules) |
@@ -55,6 +56,7 @@ make program     # load the bitstream over USB-Blaster
 - Every step passes all 40 rv32ui tests (`fence_i` and `ma_data` excluded: no Zifencei, no misaligned access).
 - Each step's design, hazards and measurements are in its note, linked from the table above.
 - Core ports and test protocol: [docs/interface.md](docs/interface.md).
+- Data cache, formally ([docs/formal.md](docs/formal.md)): the stall bound and the I/O path are proved with SymbiYosys; load-returns-last-store holds to 40 cycles.
 - Quartus build (step 5 core): all corners meet timing at 50 MHz (setup +5.209 ns, hold +0.126 ns); the board top passes the benchmark in simulation in 37,914 cycles (CPI 1.073).
 
 ## Limitations

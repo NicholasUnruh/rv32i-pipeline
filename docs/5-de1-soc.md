@@ -24,6 +24,6 @@ All corners meet timing (hold +0.126 ns). Critical path, 14.2 ns: MEM/WB `rd`, f
 
 Simulation: 40/40 tests; benchmark CPI 1.105 at 10-cycle latency. The board top, simulated with its RAM, passes the benchmark in 37,914 cycles (CPI 1.073).
 
-## Not done
+## Limitations
 
-No USB-Blaster was connected, so the bitstream has not run on the board; `make build program` loads it.
+The bitstream meets timing but has not yet run on the board; `make build program` loads it.

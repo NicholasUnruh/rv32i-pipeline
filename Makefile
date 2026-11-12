@@ -1,4 +1,4 @@
-.PHONY: check tests sim bench lint synth build program toolchain clean
+.PHONY: check tests sim bench lint synth build program toolchain clean crosscheck
 
 XPACK := xpack-riscv-none-elf-gcc-15.2.0-1
 XPACK_URL := https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases/download/v15.2.0-1/$(XPACK)-linux-x64.tar.gz
@@ -61,6 +61,15 @@ bench: build/bench/bench.hex $(RTL) tb/tb.sv
 	iverilog -g2012 -s tb -o build/tb.vvp tb/tb.sv $(RTL)
 	timeout 60 vvp -n build/tb.vvp +hex=$< | grep -m1 -E '^(PASS|FAIL|ERROR)' | tee build/bench.log
 	grep -q '^PASS' build/bench.log
+
+# Data cache against cache-sim, access by access, on every program and seven
+# geometries; needs a cache-sim build (https://github.com/NicholasUnruh/cache-sim).
+CACHESIM ?= ../cache-sim/build/cachesim
+CROSSCHECK_CACHES := 1,1,3 1,2,3 1,1,4 3,2,4 2,4,5 3,4,4 5,2,4
+crosscheck: $(HEX) build/bench/bench.hex
+	mkdir -p results/7-crosscheck
+	python3 scripts/crosscheck.py --cachesim $(CACHESIM) $(CROSSCHECK_CACHES:%=--cache %) \
+		build/bench/bench.hex $(HEX) > results/7-crosscheck/crosscheck.csv
 
 lint:
 	verilator --lint-only -Wall --top-module core $(RTL)

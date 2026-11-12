@@ -10,6 +10,7 @@ A five-stage pipelined RISC-V (RV32I) core in SystemVerilog, verified against th
 | 4 | [Instruction cache, 10-cycle memory](docs/4-icache.md) | 40/40 | Benchmark hit rate 99.6%, CPI 1.102 |
 | 5 | [Block RAM and timing closure on the DE1-SoC](docs/5-de1-soc.md) | 40/40 | Fmax 67.61 MHz, 1,822 ALMs |
 | 6 | [Data cache: set-associative, write-back, LRU](docs/6-dcache.md) | 40/40 | Benchmark CPI 1.105 → 1.120 at 10-cycle memory |
+| 7 | [Data cache checked against cache-sim, access by access](docs/7-crosscheck.md) | 40/40 | 0 of 52,528 events differ over 7 geometries |
 
 ![CPI stack per step](docs/img/cpi-stack.png)
 
@@ -45,7 +46,7 @@ make program     # load the bitstream over USB-Blaster
 | `scripts/` | Hex conversion, Verilator measurement runner, Quartus gate, figures in `docs/img/` |
 | `results/` | Measured CSVs behind the step notes |
 | `third_party/riscv-tests/` | Official test suite (unmodified submodule) |
-| `docs/` | One design note per step, core interface |
+| `docs/` | One design note per step, core interface; `docs/journal/` records the process |
 
 ## Results and verification
 
@@ -62,7 +63,7 @@ make program     # load the bitstream over USB-Blaster
 
 ## Related projects
 
-- [cache-sim](https://github.com/NicholasUnruh/cache-sim): trace-driven cache and memory-hierarchy simulator.
+- [cache-sim](https://github.com/NicholasUnruh/cache-sim): trace-driven cache simulator; step 7 checks this core's data cache against it access by access.
 - [cuda-gemm](https://github.com/NicholasUnruh/cuda-gemm): GEMM in CUDA from a naive kernel to tensor cores.
 - [openroad-chip-lab](https://github.com/NicholasUnruh/openroad-chip-lab) and [bf16-fpga](https://github.com/NicholasUnruh/bf16-fpga): a BF16 training tile from RTL to layout, then on the same DE1-SoC.
 - Portfolio: https://genwealth.world

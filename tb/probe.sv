@@ -5,7 +5,8 @@
 // +stack           print why every cycle that retired nothing was lost:
 //                  STACK cycles=N instret=M fill=F loaduse=L flush=B icmiss=I dcmiss=D
 // +trace=<file>    one line per cycle: the PC in each stage, stall, flush,
-//                  forwarding and I-cache miss (format in scripts/pipeline_trace.py)
+//                  forwarding, I-cache miss (format in scripts/pipeline_trace.py),
+//                  then D-cache stall and whether MEM/WB holds an instruction
 // +vcd=<file> +vcd_from=A +vcd_to=B   dump this module's signals for cycles A..B
 //
 // Older steps of the core lack some signals: define PROBE_NO_ICACHE (steps 2 and 3),
@@ -114,9 +115,10 @@ module probe;
   // Sampled before each rising edge: the state of the cycle that edge ends.
   always @(posedge clk)
     if (rst_n && !done && trace_fd != 0)
-      $fwrite(trace_fd, "%0d %h %h %0d %h %0d %h %0d %h %0d %0d %0d %0d %0d %0d %0d %0d %0d\n",
+      $fwrite(trace_fd, "%0d %h %h %0d %h %0d %h %0d %h %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d\n",
               tb.run_cycles, pc_if, pc_id, v_id, pc_ex, v_ex, pc_mem, v_mem, pc_wb, v_wb,
-              stall, flush, icmiss, fwd_a, fwd_b, ex_control, ex_pred_taken, ex_taken);
+              stall, flush, icmiss, fwd_a, fwd_b, ex_control, ex_pred_taken, ex_taken,
+              dstall, tb.dut.mem_wb.valid);
 
   // The window starts half a cycle early so the first edge is in the dump.
   always @(negedge clk)

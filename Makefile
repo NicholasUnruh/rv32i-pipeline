@@ -1,4 +1,4 @@
-.PHONY: check tests sim lint synth toolchain clean
+.PHONY: check tests sim bench lint synth toolchain clean
 
 XPACK := xpack-riscv-none-elf-gcc-15.2.0-1
 XPACK_URL := https://github.com/xpack-dev-tools/riscv-none-elf-gcc-xpack/releases/download/v15.2.0-1/$(XPACK)-linux-x64.tar.gz
@@ -12,7 +12,7 @@ HEX := $(TESTS:%=build/tests/%.hex)
 RTL := $(wildcard rtl/*.sv)
 
 # Run before every commit.
-check: sim lint synth
+check: sim bench lint synth
 
 toolchain:
 	test -x $(RISCV)gcc || (mkdir -p $(HOME)/.local/opt && \
@@ -45,6 +45,21 @@ sim: $(HEX) $(RTL) tb/tb.sv
 	cat build/sim.log
 	awk -F'[ =]' '/^PASS/ {c += $$4; i += $$6} END {if (i) printf "total cycles=%d instret=%d CPI=%.3f\n", c, i, c / i}' build/sim.log
 	test "$$(grep -c '^PASS' build/sim.log)" -eq $(words $(TESTS))
+
+# Bare-metal C benchmark for CPI comparisons.
+build/bench/bench.elf: tests/bench/bench.c tests/bench/crt0.S tests/env/link.ld
+	@mkdir -p build/bench
+	$(RISCV)gcc -march=rv32i -mabi=ilp32 -O2 -static -nostdlib -nostartfiles \
+		-Wl,--no-warn-rwx-segments -Ttests/env/link.ld -o $@ tests/bench/crt0.S tests/bench/bench.c -lgcc
+
+build/bench/bench.hex: build/bench/bench.elf
+	$(RISCV)objcopy -O binary $< build/bench/bench.bin
+	python3 scripts/bin2hex.py build/bench/bench.bin $@
+
+bench: build/bench/bench.hex $(RTL) tb/tb.sv
+	iverilog -g2012 -s tb -o build/tb.vvp tb/tb.sv $(RTL)
+	timeout 60 vvp -n build/tb.vvp +hex=$< | grep -m1 -E '^(PASS|FAIL|ERROR)' | tee build/bench.log
+	grep -q '^PASS' build/bench.log
 
 lint:
 	verilator --lint-only -Wall --top-module core $(RTL)

@@ -7,8 +7,13 @@ SECTIONS
   . = 0x80000000;
   .text.init : { *(.text.init) }
   .text : { *(.text) }
-  .data : { *(.data) *(.sdata) }
-  .bss : { *(.bss) *(.sbss) }
+  .rodata : { *(.rodata*) *(.srodata*) }
+  .data : { *(.data*) *(.sdata*) }
+  .bss : {
+    . = ALIGN(4); __bss_start = .;
+    *(.bss*) *(.sbss*)
+    . = ALIGN(4); __bss_end = .;
+  }
   . = 0x8000FFF0;
   .tohost : { *(.tohost) }
 }

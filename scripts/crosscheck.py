@@ -75,11 +75,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--cachesim", default=str(ROOT.parent / "cache-sim/build/cachesim"))
     parser.add_argument("--cache", action="append", default=[],
-                        help="SETS_BITS,WAYS,OFFSET_BITS (default 5,2,4)")
+                        help="SETS_BITS,WAYS,OFFSET_BITS (default 6,2,6)")
     parser.add_argument("--jobs", type=int, default=6)
     parser.add_argument("hex", nargs="+")
     args = parser.parse_args()
-    caches = [tuple(int(x) for x in c.split(",")) for c in args.cache] or [(5, 2, 4)]
+    caches = [tuple(int(x) for x in c.split(",")) for c in args.cache] or [(6, 2, 6)]
 
     binaries = {cache: build(cache) for cache in caches}
     writer = None

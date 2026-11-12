@@ -6,13 +6,13 @@
 
 - `+dtrace=<file>`: every cached data access in program order, in cache-sim's trace format (`R <hex>` or `W <hex>`).
 - `+devents=<file>`: what the RTL did with each access, in the format of `cachesim --events`: set, tag, hit or miss, the evicted tag (`*` if dirty and written back), and each way's tag afterwards.
-- `scripts/crosscheck.py` replays each trace through `cachesim` with the RTL's geometry, compares the access, miss and writeback counts, and diffs the two event files line by line. `make crosscheck CACHESIM=<path>` runs it on the C benchmark and all 40 tests at seven geometries.
+- `scripts/crosscheck.py` replays each trace through `cachesim` with the RTL's geometry, compares the access, miss and writeback counts, and diffs the two event files line by line. `make crosscheck CACHESIM=<path>` runs it on the C benchmark and all 40 tests at eight geometries.
 
 Events also check way placement and LRU order, which totals cannot.
 
 ## Measured
 
-`results/7-crosscheck/crosscheck.csv`: 287 runs (41 programs × 7 geometries), 52,528 accesses.
+`results/7-crosscheck/crosscheck.csv`: 328 runs (41 programs × 8 geometries), 60,032 accesses.
 
 | Sets × ways × line | Misses | Writebacks | Event lines that differ |
 |---|---|---|---|
@@ -23,6 +23,7 @@ Events also check way placement and LRU order, which totals cannot.
 | 8 × 4 × 16 B | 57 | 10 | 0 |
 | 4 × 4 × 32 B | 39 | 10 | 0 |
 | 32 × 2 × 16 B | 55 | 0 | 0 |
+| 64 × 2 × 64 B (default since step 8) | 23 | 0 | 0 |
 
 RTL and cache-sim agree on every count and every event line. The one difference the comparison turned up was in the testbench: Icarus prints an empty string argument as a space, which broke the event format for clean evictions.
 
@@ -42,4 +43,4 @@ The first bug changes no count at all, so a totals-only check would pass it; the
 ## Limitations
 
 - cache-sim models which accesses hit, not when; the RTL's stall per miss is fixed by design (step 6).
-- These programs are small; step 8 repeats the check on real workloads.
+- These programs are small; step 8 repeats the check on Embench: 70 runs, 55.7 million accesses, 0 differences.

@@ -8,9 +8,9 @@
 //   included, until the line is in.
 // Ports and the memory protocol are in docs/interface.md.
 module core #(
-    parameter int DCACHE_INDEX_BITS = 5,   // data cache: 2^bits sets...
+    parameter int DCACHE_INDEX_BITS = 6,   // data cache: 2^bits sets...
     parameter int DCACHE_WAYS = 2,         // ...of this many ways...
-    parameter int DCACHE_OFFSET_BITS = 4   // ...of 2^bits-byte lines
+    parameter int DCACHE_OFFSET_BITS = 6   // ...of 2^bits-byte lines (8 KB, docs/8-embench.md)
 ) (
     input  logic        clk,
     input  logic        rst_n,

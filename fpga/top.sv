@@ -15,6 +15,7 @@ module top (
     output logic [6:0] HEX5
 );
   localparam logic [31:0] TOHOST = 32'h4000_0000;  // I/O: not in RAM
+  localparam int DCACHE_OFFSET_BITS = 6;
 
   logic clk;
   assign clk = CLOCK_50;
@@ -39,9 +40,9 @@ module top (
   logic [3:0] dmem_wstrb;
 
   core #(
-      .DCACHE_INDEX_BITS(5),
+      .DCACHE_INDEX_BITS(6),
       .DCACHE_WAYS(2),
-      .DCACHE_OFFSET_BITS(4)
+      .DCACHE_OFFSET_BITS(DCACHE_OFFSET_BITS)
   ) cpu (
       .clk(clk),
       .rst_n(rst_n),
@@ -71,7 +72,7 @@ module top (
       .word(ifill_word),
       .rvalid(imem_rvalid)
   );
-  line_fill #(.LINE_WORDS(4)) dfill (
+  line_fill #(.LINE_WORDS(1 << (DCACHE_OFFSET_BITS - 2))) dfill (
       .clk(clk),
       .rst_n(rst_n),
       .req(dmem_req),

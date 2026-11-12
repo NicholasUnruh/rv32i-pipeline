@@ -8,9 +8,9 @@
 `timescale 1ns / 1ps
 
 module tb #(
-    parameter int DCACHE_INDEX_BITS = 5,
+    parameter int DCACHE_INDEX_BITS = 6,
     parameter int DCACHE_WAYS = 2,
-    parameter int DCACHE_OFFSET_BITS = 4
+    parameter int DCACHE_OFFSET_BITS = 6
 );
   localparam logic [31:0] BASE = 32'h8000_0000;
   localparam logic [31:0] TOHOST = 32'h4000_0000;  // I/O: not cached

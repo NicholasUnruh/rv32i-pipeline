@@ -4,9 +4,9 @@ The testbench (`tb/tb.sv`) drives one module, `core`, in `rtl/core.sv`:
 
 ```systemverilog
 module core #(
-    parameter int DCACHE_INDEX_BITS = 5,   // data cache: 2^bits sets (at least 1 bit),
+    parameter int DCACHE_INDEX_BITS = 6,   // data cache: 2^bits sets (at least 1 bit),
     parameter int DCACHE_WAYS = 2,         // ways per set,
-    parameter int DCACHE_OFFSET_BITS = 4   // 2^bits-byte lines (at least 3 bits)
+    parameter int DCACHE_OFFSET_BITS = 6   // 2^bits-byte lines (at least 3 bits)
 ) (
     input  logic        clk,
     input  logic        rst_n,       // active-low; PC resets to 32'h8000_0000

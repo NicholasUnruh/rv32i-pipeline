@@ -3,9 +3,11 @@
 
 measure.py [--cache SETS_BITS,WAYS,OFFSET_BITS ...] [--latency N ...] [--jobs N] hex...
 
-Each data cache geometry gets its own Verilator build in build/vl/. Every
-program runs at every latency; the columns are the testbench's PASS fields.
-Exits 1 if any run fails.
+Each data cache geometry gets its own Verilator build in build/vl/, with
+tb/probe.sv. Every program runs at every latency; the columns are the
+testbench's PASS fields, then the probe's lost cycles by cause (fill, loaduse,
+flush, icmiss, dcmiss), which with instret add up to the cycles. Exits 1 if any
+run fails.
 """
 
 from __future__ import annotations
@@ -28,10 +30,11 @@ def build(cache: tuple[int, int, int]) -> Path:
     index_bits, ways, offset_bits = cache
     out = ROOT / "build" / "vl" / f"i{index_bits}w{ways}o{offset_bits}"
     out.mkdir(parents=True, exist_ok=True)
-    sources = [ROOT / "tb" / "tb.sv", *sorted((ROOT / "rtl").glob("*.sv"))]
+    sources = [ROOT / "tb" / "tb.sv", ROOT / "tb" / "probe.sv",
+               *sorted((ROOT / "rtl").glob("*.sv"))]
     subprocess.run(
-        ["verilator", "--binary", "--timing", "-j", "4", "-O3", "--top-module", "tb",
-         "-Wno-fatal", "-Wno-lint", "-Wno-style", "-Wno-INITIALDLY",
+        ["verilator", "--binary", "--timing", "-j", "4", "-O3",
+         "-Wno-fatal", "-Wno-lint", "-Wno-style", "-Wno-INITIALDLY", "-Wno-MULTITOP",
          f"-GDCACHE_INDEX_BITS={index_bits}", f"-GDCACHE_WAYS={ways}",
          f"-GDCACHE_OFFSET_BITS={offset_bits}",
          "-Mdir", str(out), "-o", "vtb", *map(str, sources)],
@@ -43,26 +46,30 @@ def run(binary: Path, hex_file: str, latency: int, extra: list[str]) -> dict[str
     """Run one program; return the PASS line's fields."""
     result = subprocess.run(
         [str(binary), f"+hex={hex_file}", f"+mem_latency={latency}",
-         f"+max_cycles={MAX_CYCLES}", *extra],
+         f"+max_cycles={MAX_CYCLES}", "+stack", *extra],
         capture_output=True, text=True, timeout=RUN_TIMEOUT_S)
     line = next((l for l in result.stdout.splitlines()
                  if l.startswith(("PASS", "FAIL", "ERROR"))), "no result")
     if not line.startswith("PASS"):
         raise RuntimeError(f"{hex_file} L={latency}: {line}")
-    return dict(re.findall(r"(\w+)=(\S+)", line))
+    fields = dict(re.findall(r"(\w+)=(\S+)", line))
+    stack = next(l for l in result.stdout.splitlines() if l.startswith("STACK"))
+    causes = {k: v for k, v in re.findall(r"(\w+)=(\S+)", stack)
+              if k not in ("cycles", "instret")}
+    return {**fields, **causes}
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--cache", action="append", default=[],
-                        help="SETS_BITS,WAYS,OFFSET_BITS (default 5,2,4)")
+                        help="SETS_BITS,WAYS,OFFSET_BITS (default 6,2,6)")
     parser.add_argument("--latency", action="append", type=int, default=[])
     parser.add_argument("--jobs", type=int, default=6)
     parser.add_argument("--plusarg", action="append", default=[],
                         help="extra testbench plusarg, e.g. +dtrace=x (use {name} for the program)")
     parser.add_argument("hex", nargs="+")
     args = parser.parse_args()
-    caches = [tuple(int(x) for x in c.split(",")) for c in args.cache] or [(5, 2, 4)]
+    caches = [tuple(int(x) for x in c.split(",")) for c in args.cache] or [(6, 2, 6)]
     latencies = args.latency or [10]
 
     binaries = {cache: build(cache) for cache in caches}

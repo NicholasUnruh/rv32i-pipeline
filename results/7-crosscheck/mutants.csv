@@ -1,0 +1,5 @@
+mutant,program,sets,ways,line,rtl_accesses,sim_accesses,rtl_misses,sim_misses,rtl_writebacks,sim_writebacks,event_lines,differing_lines,match
+last_invalid_way,bench,2,2,8,6694,6694,2080,2080,1549,1549,6694,6694,False
+last_invalid_way,bench,8,4,16,6694,6694,42,42,10,10,6694,6694,False
+fill_not_mru,bench,2,2,8,6694,6694,2110,2080,1556,1549,6694,3895,False
+fill_not_mru,bench,8,4,16,6694,6694,43,42,11,10,6694,33,False

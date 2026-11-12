@@ -2,6 +2,9 @@
 // one PASS or FAIL line with the cycles, retired instructions, instruction fetches
 // and line fills, and data cache accesses, hits, misses and writebacks, from reset
 // release to the tohost store. The data cache geometry comes from the parameters.
+// For checking the data cache against cache-sim:
+//   +dtrace=<file>   every cached data access in order, as cache-sim's trace format
+//   +devents=<file>  one line per access in the format of `cachesim --events`
 `timescale 1ns / 1ps
 
 module tb #(
@@ -33,6 +36,8 @@ module tb #(
   int dhits = 0;
   int dmisses = 0;
   int dwritebacks = 0;
+  int dtrace_fd = 0;
+  int devents_fd = 0;
 
   core #(
       .DCACHE_INDEX_BITS(DCACHE_INDEX_BITS),
@@ -122,9 +127,57 @@ module tb #(
     end
   end
 
+  // Data cache events, from the cache's own signals. An access is logged when it
+  // first reaches the lookup (hit or miss, and the victim it evicts) and finished
+  // when it hits, after any refill, with the tags its set then holds, way by way.
+  localparam int DTAG_SHIFT = DCACHE_INDEX_BITS + DCACHE_OFFSET_BITS;
+  logic [31:0] way_tag[DCACHE_WAYS];
+  logic way_valid[DCACHE_WAYS];
+  for (genvar w = 0; w < DCACHE_WAYS; w++) begin : g_way
+    assign way_tag[w] = 32'(dut.dc.g_way[w].tags[dut.dc.set]);
+    assign way_valid[w] = dut.dc.valid[dut.dc.set][w];
+  end
+  logic ev_write, ev_hit, ev_evicts, ev_dirty;
+  logic [31:0] ev_addr, ev_victim;
+
+  always @(posedge clk)
+    if (rst_n) begin
+      if (dut.dc.ev_access && dtrace_fd != 0)
+        $fwrite(dtrace_fd, "%s %0h\n", dut.dc.write ? "W" : "R", dut.dc.addr);
+      if (dut.dc.ev_access) begin
+        ev_write = dut.dc.write;
+        ev_addr = dut.dc.addr;
+        ev_hit = dut.dc.ev_hit;
+        ev_evicts = dut.dc.ev_miss && dut.dc.valid[dut.dc.set][dut.dc.victim_c];
+        ev_victim = 32'(dut.dc.tag_q[dut.dc.victim_c]);
+        ev_dirty = dut.dc.ev_writeback;
+      end
+      if (dut.dc.lookup && dut.dc.hit && devents_fd != 0) begin
+        $fwrite(devents_fd, "%s %0h %0h %0h %s ", ev_write ? "W" : "R", ev_addr, dut.dc.set,
+                ev_addr >> DTAG_SHIFT, ev_hit ? "H" : "M");
+        if (!ev_evicts) $fwrite(devents_fd, "-");
+        else if (ev_dirty) $fwrite(devents_fd, "%0h*", ev_victim);
+        else $fwrite(devents_fd, "%0h", ev_victim);
+        for (int w = 0; w < DCACHE_WAYS; w++)
+          if (way_valid[w]) $fwrite(devents_fd, " %0h", way_tag[w]);
+          else $fwrite(devents_fd, " -");
+        $fwrite(devents_fd, "\n");
+      end
+    end
+
+  string path;
+  initial begin
+    if ($value$plusargs("dtrace=%s", path)) dtrace_fd = $fopen(path, "w");
+    if ($value$plusargs("devents=%s", path)) devents_fd = $fopen(path, "w");
+  end
+  final begin
+    if (dtrace_fd != 0) $fclose(dtrace_fd);
+    if (devents_fd != 0) $fclose(devents_fd);
+  end
+
   initial begin
     if (!$value$plusargs("hex=%s", hex))
-      $fatal(1, "usage: +hex=<file> [+mem_latency=N] [+max_cycles=N]");
+      $fatal(1, "usage: +hex=<file> [+mem_latency=N] [+max_cycles=N] [+dtrace=F] [+devents=F]");
     void'($value$plusargs("mem_latency=%d", mem_latency));
     void'($value$plusargs("max_cycles=%d", max_cycles));
     if (mem_latency < 1) $fatal(1, "mem_latency must be at least 1");

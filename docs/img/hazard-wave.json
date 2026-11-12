@@ -1,0 +1,115 @@
+{
+ "signal": [
+  {
+   "name": "clk",
+   "wave": "p........."
+  },
+  {
+   "name": "IF",
+   "wave": "========.=",
+   "data": [
+    "598 add",
+    "59c bnez",
+    "544 slli",
+    "548 xor",
+    "5a0 sw",
+    "5a4 lw",
+    "5a8 beqz",
+    "5ac li",
+    "5b0 andi"
+   ]
+  },
+  {
+   "name": "ID",
+   "wave": "====x===.=",
+   "data": [
+    "594 addi",
+    "598 add",
+    "59c bnez",
+    "544 slli",
+    "5a0 sw",
+    "5a4 lw",
+    "5a8 beqz",
+    "5ac li"
+   ]
+  },
+  {
+   "name": "EX",
+   "wave": "====xx==x=",
+   "data": [
+    "590 li",
+    "594 addi",
+    "598 add",
+    "59c bnez",
+    "5a0 sw",
+    "5a4 lw",
+    "5a8 beqz"
+   ]
+  },
+  {
+   "name": "MEM",
+   "wave": "=====xx==x",
+   "data": [
+    "61c j",
+    "590 li",
+    "594 addi",
+    "598 add",
+    "59c bnez",
+    "5a0 sw",
+    "5a4 lw"
+   ]
+  },
+  {
+   "name": "WB",
+   "wave": "x=====xx==",
+   "data": [
+    "61c j",
+    "590 li",
+    "594 addi",
+    "598 add",
+    "59c bnez",
+    "5a0 sw",
+    "5a4 lw"
+   ]
+  },
+  {},
+  {
+   "name": "stall",
+   "wave": "0......10."
+  },
+  {
+   "name": "flush",
+   "wave": "0..10....."
+  },
+  {
+   "name": "icmiss",
+   "wave": "0........1"
+  },
+  {
+   "name": "EX rs1 from",
+   "wave": "=..==....=",
+   "data": [
+    "regfile",
+    "MEM/WB",
+    "regfile",
+    "MEM/WB"
+   ]
+  },
+  {
+   "name": "EX rs2 from",
+   "wave": "=.==......",
+   "data": [
+    "regfile",
+    "MEM/WB",
+    "regfile"
+   ]
+  }
+ ],
+ "config": {
+  "hscale": 2
+ },
+ "head": {
+  "text": "Load-use stall, MEM/WB forward and misprediction flush (C benchmark; x = bubble)",
+  "tick": 21923
+ }
+}

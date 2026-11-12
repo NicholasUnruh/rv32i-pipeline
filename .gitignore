@@ -3,3 +3,4 @@ build/
 __pycache__/
 *.local.md
 formal/dcache_*/
+formal/dcache/

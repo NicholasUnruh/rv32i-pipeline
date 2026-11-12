@@ -116,26 +116,30 @@ module dcache #(
   assign store_hit = lookup && hit && write;
   assign fill_word = state == FILL && mem_rvalid;
 
-  for (genvar w = 0; w < WAYS; w++) begin : g_way
-    logic [TAG_BITS-1:0] tags[SETS];
-    logic [31:0] words[SETS * LINE_WORDS];  // word {set, offset}
-    logic we;
-    logic [3:0] be;
-    logic [INDEX_BITS+WORD_BITS-1:0] waddr;
-    logic [31:0] wd;
+  // Quartus parses only the SystemVerilog-2005 form of a generate loop.
+  genvar way;
+  generate
+    for (way = 0; way < WAYS; way = way + 1) begin : g_way
+      logic [TAG_BITS-1:0] tags[SETS];
+      logic [31:0] words[SETS * LINE_WORDS];  // word {set, offset}
+      logic we;
+      logic [3:0] be;
+      logic [INDEX_BITS+WORD_BITS-1:0] waddr;
+      logic [31:0] wd;
 
-    assign we = (store_hit && hit_way == WAY_BITS'(w)) || (fill_word && victim == WAY_BITS'(w));
-    assign be = fill_word ? 4'b1111 : wstrb;
-    assign waddr = {set, fill_word ? count[WORD_BITS-1:0] : word};
-    assign wd = fill_word ? mem_rdata : wdata;
+      assign we = (store_hit && hit_way == WAY_BITS'(way)) || (fill_word && victim == WAY_BITS'(way));
+      assign be = fill_word ? 4'b1111 : wstrb;
+      assign waddr = {set, fill_word ? count[WORD_BITS-1:0] : word};
+      assign wd = fill_word ? mem_rdata : wdata;
 
-    always_ff @(posedge clk) begin
-      tag_q[w] <= tags[read_set];
-      data_q[w] <= words[{read_set, read_word}];
-      if (state == REQUEST && victim == WAY_BITS'(w)) tags[set] <= tag;
-      for (int b = 0; b < 4; b++) if (we && be[b]) words[waddr][8*b+:8] <= wd[8*b+:8];
+      always_ff @(posedge clk) begin
+        tag_q[way] <= tags[read_set];
+        data_q[way] <= words[{read_set, read_word}];
+        if (state == REQUEST && victim == WAY_BITS'(way)) tags[set] <= tag;
+        for (int b = 0; b < 4; b++) if (we && be[b]) words[waddr][8*b+:8] <= wd[8*b+:8];
+      end
     end
-  end
+  endgenerate
 
   // ---------------------------------------------------------------- memory
   // Writeback: word k is read in cycle k and written in cycle k+1.

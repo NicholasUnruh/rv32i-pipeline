@@ -12,11 +12,11 @@ A five-stage pipelined RISC-V (RV32I) core in SystemVerilog, verified against th
 | 6 | [Data cache: set-associative, write-back, LRU](docs/6-dcache.md) | 40/40 | Benchmark CPI 1.105 → 1.120 at 10-cycle memory |
 | 7 | [Data cache checked against cache-sim, access by access](docs/7-crosscheck.md) | 40/40 | 0 of 60,032 events differ |
 | 8 | [Embench-IoT; data cache chosen with cache-sim](docs/8-embench.md) | 40/40 | Embench mean CPI 2.103 → 1.914 (8 KB D-cache) |
-| 9 | [Final core on the DE1-SoC: fit and Fmax](docs/9-final-fit.md) | 40/40 | Fmax 81.47 MHz, 2,437 ALMs |
+| 9 | [Final core on the DE1-SoC: fit and Fmax](docs/9-final-fit.md) | 40/40 | Fmax 72.2–75.1 MHz (4 seeds), 2,449 ALMs |
 
 ![CPI stack per step](docs/img/cpi-stack.png)
 
-*Cycles that retired nothing, by cause, per step (`scripts/cpi_stack.py`).*
+*Cycles retiring nothing, by cause, per step (`scripts/cpi_stack.py`).*
 
 Each step adds one mechanism and measures what it buys; nothing is estimated.
 

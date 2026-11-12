@@ -1,0 +1,6 @@
+program,sets_bits,ways,offset_bits,latency,cycles,instret,fetches,fills,daccesses,dhits,dmisses,dwritebacks
+bench,5,2,4,1,38175,35324,36132,138,6694,6654,40,0
+bench,5,2,4,2,38329,35324,36132,138,6694,6654,40,0
+bench,5,2,4,5,38791,35324,36132,138,6694,6654,40,0
+bench,5,2,4,10,39561,35324,36130,138,6694,6654,40,0
+bench,5,2,4,20,41101,35324,36130,138,6694,6654,40,0

@@ -1,4 +1,4 @@
-// Startup for the C benchmark: zero .bss, set the stack below tohost, call main.
+// Startup for the C benchmark: zero .bss, set the stack at the top of memory, call main.
   .section .text.init
   .globl _start
 _start:

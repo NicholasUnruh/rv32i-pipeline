@@ -1,4 +1,5 @@
-/* 64 KB of memory at 0x80000000; tohost is the last 16 bytes' first word. */
+/* 64 KB of memory at 0x80000000. tohost is an uncached I/O word at 0x40000000;
+   NOLOAD keeps it out of the memory image. */
 OUTPUT_ARCH("riscv")
 ENTRY(_start)
 
@@ -14,6 +15,5 @@ SECTIONS
     *(.bss*) *(.sbss*)
     . = ALIGN(4); __bss_end = .;
   }
-  . = 0x8000FFF0;
-  .tohost : { *(.tohost) }
+  .tohost 0x40000000 (NOLOAD) : { *(.tohost) }
 }

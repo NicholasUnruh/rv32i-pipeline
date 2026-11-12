@@ -4,18 +4,26 @@
 // - Control: IF predicts with a BTB; branches and jumps resolve in EX, and a
 //   misprediction flushes IF and ID.
 // - Fetch: IF reads an instruction cache; a miss sends bubbles until the line is in.
+// - Data: MEM reads and writes a data cache; a miss freezes every stage, WB
+//   included, until the line is in.
 // Ports and the memory protocol are in docs/interface.md.
-module core (
+module core #(
+    parameter int DCACHE_INDEX_BITS = 5,   // data cache: 2^bits sets...
+    parameter int DCACHE_WAYS = 2,         // ...of this many ways...
+    parameter int DCACHE_OFFSET_BITS = 4   // ...of 2^bits-byte lines
+) (
     input  logic        clk,
     input  logic        rst_n,
     output logic        imem_req,
     output logic [31:0] imem_addr,
     input  logic        imem_rvalid,
     input  logic [31:0] imem_rdata,
-    output logic [31:0] dmem_addr,   // driven from EX; read data returns in MEM
+    output logic        dmem_req,
+    output logic [31:0] dmem_addr,
+    input  logic        dmem_rvalid,
+    input  logic [31:0] dmem_rdata,
     output logic [31:0] dmem_wdata,
     output logic [3:0]  dmem_wstrb,
-    input  logic [31:0] dmem_rdata,
     output logic        fetch,       // IF passed an instruction to ID this cycle
     output logic        retire       // an instruction completed this cycle
 );
@@ -48,9 +56,11 @@ module core (
   typedef struct packed {
     logic        valid;
     logic [4:0]  rd;
-    logic        reg_write, mem_read;
+    logic        reg_write, mem_read, mem_write;
     logic [2:0]  funct3;
     logic [31:0] result;     // ALU result (the address for memory), or PC+4 for jumps
+    logic [31:0] store_data; // on its byte lanes
+    logic [3:0]  store_strb;
   } ex_mem_t;
 
   typedef struct packed {
@@ -67,6 +77,7 @@ module core (
 
   logic stall;     // load-use hazard: hold IF and ID, send a bubble to EX
   logic redirect;  // misprediction in EX: flush IF and ID
+  logic dstall;    // data cache miss in MEM: hold every stage
   logic [31:0] redirect_pc;
 
   // ---------------------------------------------------------------- IF
@@ -91,7 +102,7 @@ module core (
       .mem_rdata(imem_rdata)
   );
 
-  assign fetch = cache_hit && !stall && !redirect;
+  assign fetch = cache_hit && !stall && !redirect && !dstall;
 
   always_comb begin
     if_id_next.valid = cache_hit;  // a miss sends a bubble
@@ -105,7 +116,7 @@ module core (
   always_comb begin
     if (!rst_n) next_pc = RESET_PC;
     else if (redirect) next_pc = redirect_pc;
-    else if (stall || !cache_hit) next_pc = pc;
+    else if (dstall || stall || !cache_hit) next_pc = pc;
     else if (pred_taken) next_pc = pred_target;
     else next_pc = pc + 32'd4;
   end
@@ -226,8 +237,8 @@ module core (
       || (id_ex.branch && branch_taken(id_ex.funct3, fwd_a, fwd_b));
   assign target = id_ex.jalr ? (fwd_a + id_ex.imm) & ~32'd1 : id_ex.pc + id_ex.imm;
   assign pc_plus4 = id_ex.pc + 32'd4;
-  assign redirect = id_ex.valid && (taken != id_ex.pred_taken
-                                    || (taken && target != id_ex.pred_target));
+  assign redirect = id_ex.valid && !dstall && (taken != id_ex.pred_taken
+                                               || (taken && target != id_ex.pred_target));
   assign redirect_pc = taken ? target : pc_plus4;
 
   btb predictor (
@@ -238,7 +249,7 @@ module core (
       .lookup_hit(pred_hit),
       .predict_taken(pred_taken),
       .predict_target(pred_target),
-      .update(id_ex.valid && is_control),
+      .update(id_ex.valid && is_control && !dstall),
       .update_pc(id_ex.pc[31:2]),
       .update_hit(id_ex.pred_hit),
       .update_taken(taken),
@@ -250,28 +261,53 @@ module core (
     ex_mem_next.rd = id_ex.rd;
     ex_mem_next.reg_write = id_ex.reg_write;
     ex_mem_next.mem_read = id_ex.mem_read;
+    ex_mem_next.mem_write = id_ex.mem_write;
     ex_mem_next.funct3 = id_ex.funct3;
     ex_mem_next.result = id_ex.jal || id_ex.jalr ? pc_plus4 : alu_y;
+    ex_mem_next.store_data = store_data(id_ex.funct3[1:0], fwd_b);
+    ex_mem_next.store_strb = id_ex.mem_write ? store_strobe(id_ex.funct3[1:0], alu_y[1:0]) : 4'b0;
   end
 
-  // Data memory is synchronous (block RAM): EX sends the address and any store,
-  // and a load's word comes back during MEM. The instruction in EX is never
-  // flushed or stalled, so a store issued here always commits.
-  assign dmem_addr = alu_y;
-  assign dmem_wdata = store_data(id_ex.funct3[1:0], fwd_b);
-  assign dmem_wstrb = id_ex.mem_write ? store_strobe(id_ex.funct3[1:0], alu_y[1:0]) : 4'b0;
-
   // ---------------------------------------------------------------- MEM
+  // The cache arrays are synchronous: EX sends the address, and MEM gets the
+  // word and the hit a clock later.
+  logic [31:0] load_word;
+
+  dcache #(
+      .INDEX_BITS(DCACHE_INDEX_BITS),
+      .WAYS(DCACHE_WAYS),
+      .OFFSET_BITS(DCACHE_OFFSET_BITS)
+  ) dc (
+      .clk(clk),
+      .rst_n(rst_n),
+      .ex_addr(alu_y[31:2]),
+      .read(ex_mem.mem_read),
+      .write(ex_mem.mem_write),
+      .addr(ex_mem.result),
+      .wdata(ex_mem.store_data),
+      .wstrb(ex_mem.store_strb),
+      .rdata(load_word),
+      .stall(dstall),
+      .mem_req(dmem_req),
+      .mem_addr(dmem_addr),
+      .mem_rvalid(dmem_rvalid),
+      .mem_rdata(dmem_rdata),
+      .mem_wstrb(dmem_wstrb),
+      .mem_wdata(dmem_wdata)
+  );
+
   always_comb begin
     mem_wb_next.valid = ex_mem.valid;
     mem_wb_next.rd = ex_mem.rd;
     mem_wb_next.reg_write = ex_mem.reg_write;
     mem_wb_next.value = ex_mem.mem_read
-        ? load_extend(ex_mem.funct3, ex_mem.result[1:0], dmem_rdata) : ex_mem.result;
+        ? load_extend(ex_mem.funct3, ex_mem.result[1:0], load_word) : ex_mem.result;
   end
 
   // ---------------------------------------------------------------- WB
-  assign retire = mem_wb.valid;
+  // WB holds through a data miss so that EX can still forward from it; it writes
+  // the same value each cycle but retires once.
+  assign retire = mem_wb.valid && !dstall;
 
   // ---------------------------------------------------------------- registers
   always_ff @(posedge clk or negedge rst_n) begin
@@ -280,7 +316,7 @@ module core (
       id_ex <= '0;
       ex_mem <= '0;
       mem_wb <= '0;
-    end else begin
+    end else if (!dstall) begin
       if (redirect) if_id <= '0;
       else if (!stall) if_id <= if_id_next;
       id_ex <= redirect ? '0 : id_ex_next;

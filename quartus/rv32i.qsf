@@ -8,9 +8,11 @@ set_global_assignment -name SDC_FILE timing.sdc
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/alu.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/btb.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/core.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/dcache.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/decoder.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/icache.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../rtl/regfile.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ../../fpga/line_fill.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../fpga/ram.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../fpga/seven_segment.sv
 set_global_assignment -name SYSTEMVERILOG_FILE ../../fpga/top.sv
